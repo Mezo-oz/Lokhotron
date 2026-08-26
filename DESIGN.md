@@ -68,6 +68,15 @@ runs, the only platform with grassroots sideloading and offline replication, and
 client-as-sensor can scale. iOS, if ever supported, is a store-delivered bundle consumer only,
 never a sensor or re-distributor.
 
+### Name invariant
+
+**The name "Lokhotron" (лохотрон, roughly "the scam/rigged-game") never appears anywhere
+client-side.** It's apt for a censor-facing measurement backend and safe *only* because the trust
+boundary keeps it off anything a Russian user or the adversary sees on a device. Since the client
+is Amnezia-upstream it won't appear there by default — but state it as a hard invariant: no
+Lokhotron string, asset, endpoint hostname, or user-agent in any client-facing artifact or in the
+contract payloads that reach the client. The boundary is what makes the joke safe; don't leak it.
+
 ---
 
 ## The two core insights (kept, but narrowed)
@@ -179,20 +188,48 @@ Phase 1's minimum form is **one RU VPS + one non-RU VPS + a probe battery** — 
 ~$10/mo. That's the scarce asset and the thesis test. If the delta is uninformative (everything
 times out identically, no distinguishable shapes), you want that in week one.
 
-- **Phase 0 (≤1 week, time-boxed):** ingest OONI + Censored Planet + GFW Report / net4people as
-  **context for interpreting your own probes**, not the headline. Only write ingest code Phase 1
-  reuses.
-- **Phase 1 (the you-shaped core, a complete deliverable):** one non-RU reverse-measurement
-  server + a couple RU VPS + maybe 1–2 vetted residential volunteers. Run the probe battery. Get
-  the **sequence-marked echo delta** working. A differential probe pair that outputs *"here's what
-  the TSPU did to an AmneziaWG handshake in Rostelecom today, at segment granularity"* is
-  **publishable on its own** (net4people) and earns the credibility that makes volunteer
-  recruitment and client adoption plausible later.
+**Sequencing vs dpi-bench: parallelize, do not gate.** An earlier draft said "finish dpi-bench
+first because it teaches the primitive." That quietly overstates what finishing it buys Lokhotron
+— per Correction 2 the inheritance is narrow: the reassembler doesn't transfer, the echo protocol
+and AF_PACKET capture are new code, and what carries over is the *verdict-vocabulary discipline*,
+not the dpi-bench artifact. Gating on it spends weeks not knowing whether the central bet holds —
+the same procrastination-in-costume as a Phase 0 dashboard, in a safer-looking hat. The two are
+independent tracks.
+
+The real instinct under "do dpi-bench first" is correct, though: **you need ground truth before
+you trust a live delta, because on the live wire you cannot tell a capture bug from a finding.**
+The fix isn't dpi-bench — it's applying dpi-bench's discipline to Lokhotron's own code, as
+**Phase 1 step 0**.
+
+- **Phase 1 step 0 — local fault-injection calibration (do this first).** A netns/loopback
+  harness that self-injects each verdict against known ground truth (`drop-segment-N`,
+  `injected-rst-at-sni`, `payload-mutated`, `throttle-to-rate-R`, `udp-class-drop`) with
+  tc/nftables/NFQUEUE, and asserts the echo protocol + AF_PACKET capture + verdict classifier
+  label each one **correctly**. This is the safety net Phase 1 wanted from dpi-bench, on the actual
+  code that ships, in a fraction of the time. Full design in [ECHO.md](ECHO.md).
+- **Phase 0 (kept, but narrowed to one job):** ingest OONI + Censored Planet + GFW Report /
+  net4people as **context for interpreting your own probes**. The *one* job that justifies keeping
+  it: OONI already has residential RU coverage for tool-reachability tests (telegram/tor/torsf).
+  Run the **same** reachability checks from your DC VPS and diff them against OONI's residential
+  signal for the same operator — the difference is your first **recruitment-free** read on the
+  DC-vs-consumer gap. Directional, not apples-to-apples with protocol-handshake shaping, but it
+  either shows the gap or doesn't. Only write ingest code that serves this comparison.
+- **Phase 1 (the you-shaped core, a complete deliverable):** after calibration passes, one non-RU
+  reverse-measurement server + a couple RU VPS. Run the probe battery live. Get the
+  **sequence-marked echo delta** working (see [ECHO.md](ECHO.md)).
+  - **Scope the honest claim to the vantage you actually have.** A VPS-only Phase 1 characterizes
+    the **DC path** — it cannot by itself confirm the DC-vs-consumer gap (no consumer vantage to
+    compare against), and that gap is load-bearing under Correction 3. So the publishable claim is
+    *"here's what the TSPU does to an AmneziaWG handshake on a **Rostelecom datacenter path**
+    today, at segment granularity"* — still publishable (net4people) — **plus** the OONI-residential
+    reachability comparison above as the directional gap read. Don't overclaim a consumer result
+    from a DC probe.
 - **Phase 2:** analysis layer (survival **distribution** per {ASN, region}, not argmax) + signed
   strategy-bundle push with sampling + dark endpoints.
-- **Phase 3:** fuse with the client — opt-in client-as-sensor telemetry (the residential unlock)
-  feeding the store, clients auto-healing from bundles. **Everything downstream is justified by
-  what Phase 1 finds, not committed now.**
+- **Phase 3:** fuse with the client — opt-in client-as-sensor telemetry (the residential unlock,
+  and the *only* clean way to close the gap without the recruitment/ethics problem) feeding the
+  store, clients auto-healing from bundles. **Everything downstream is justified by what Phase 1
+  finds, not committed now.**
 
 ---
 
@@ -263,7 +300,13 @@ Full rationale and the Android duress/PanicKit design in `X:\Lokhotron-client\DI
 ## To verify before this hardens (don't trust from memory)
 
 - TSPU's current treatment of datacenter vs consumer ASNs — the whole DC/consumer correction
-  rests on this; confirm with fresh probes, don't assume.
+  rests on this; the DC-VPS probe + OONI-residential-reachability diff (Phase 0/1) is the first
+  read on it, but confirm rather than assume.
 - Current Russian legal exposure for running a sensor / recruiting a volunteer (active, changing
   legislation).
-- OONI and Censored Planet current API shapes before writing Phase 0 ingest.
+- OONI and Censored Planet current API shapes before writing Phase 0 ingest — specifically which
+  residential RU reachability tests are currently populated for the operators you care about.
+- **Reconcile the verdict vocabulary against dpi-bench's property vocabulary once that firms up.**
+  They are mirror images (a well-formed strategy vs. a tampered one on the wire); the byte-level
+  properties dpi-bench pins down are a one-way *pull* into [CONTRACT.md](CONTRACT.md) Part 1, not a
+  blocker on either track. Owned here; dpi-bench work is a separate session.

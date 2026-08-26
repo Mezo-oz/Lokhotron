@@ -21,6 +21,10 @@ trees."
   DC-vs-consumer gap), and phasing.
 - **[CONTRACT.md](CONTRACT.md)** — the versioned spec that crosses the boundary to the client:
   verdict vocabulary, telemetry schema (k-anon), signed strategy-bundle format.
+- **[ECHO.md](ECHO.md)** — the sequence-marked echo protocol: the two-capture-point delta, markers
+  without a fingerprint, verdict derivation, and the Phase 1 step-0 fault-injection calibration
+  harness (the ground-truth net that replaces "do dpi-bench first").
+- **[STATUS.md](STATUS.md)** — living sitrep: phase status, locked decisions, next actions.
 
 ## Status
 

@@ -43,6 +43,15 @@ Verdicts are **additive by minor version**: new verdicts may be appended; existi
 change meaning. A client seeing an unknown verdict in aggregated data treats it as
 `timeout-indistinct`.
 
+> **Reconcile against dpi-bench's property vocabulary.** This taxonomy and dpi-bench's per-strategy
+> property vocabulary are mirror images: dpi-bench asserts what a *well-formed* split/seqovl/fake
+> looks like at the byte level; a verdict here names what a *tampered* one looks like on the wire.
+> Knowing the former sharpens the latter (esp. `payload-mutated` and `silent-drop-from-segment-N`).
+> When that dpi-bench work firms up, **pull** its byte-level properties into this table — a one-way
+> import, never a dependency that blocks either track. dpi-bench is a separate session; this file
+> stays the source of truth for the wire-side taxonomy. How each verdict is *derived* from the
+> sent-vs-arrived delta is specified in [ECHO.md](ECHO.md).
+
 ---
 
 ## Part 2 — Telemetry schema (#2 → #1)

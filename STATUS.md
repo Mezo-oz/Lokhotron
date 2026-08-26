@@ -1,7 +1,7 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-08-26.
+> or an open question closes. Last updated: 2026-08-26 (added ECHO.md protocol spec; sequencing + calibration + gap-read folded in).
 
 ## What it is
 
@@ -61,26 +61,42 @@ No worm, no covert install. Android duress design = PanicKit (fork if needed) �
 keys; recommend GrapheneOS duress PIN for the high-risk tier. Full rationale in
 `X:\Lokhotron-client\DISTRIBUTION.md`.
 
+## Sequencing decision (locked)
+
+Do **not** gate Lokhotron on finishing dpi-bench — the inheritance is narrow (Correction 2), so
+gating just spends weeks not knowing if the bet holds. The two are **independent parallel tracks**
+(dpi-bench runs in its own session). The ground-truth safety net comes instead from **Phase 1 step
+0**: a local fault-injection calibration harness that proves the echo protocol + capture +
+classifier against known-injected verdicts before any live run. See [ECHO.md](ECHO.md) §7.
+
 ## Phase status
 
 | Phase | State |
 |---|---|
-| Design | **Done** — DESIGN + CONTRACT + this file committed. |
-| Phase 0 (context ingest, ≤1 wk) | Not started. |
-| Phase 1 (2 VPS + probe battery + echo delta) | **Next.** Not started. |
+| Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
+| Phase 1 **step 0** (local fault-injection calibration harness) | **Next.** Not started. |
+| Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
+| Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
-| Phase 3 (client-as-sensor fusion) | Not started. |
+| Phase 3 (client-as-sensor fusion — the only clean gap-closer) | Not started. |
 
 ## Open before hardening (verify, don't trust from memory)
 
-- TSPU's current DC-vs-consumer treatment — Phase 1 should confirm; the whole third correction
-  rests on it.
+- TSPU's current DC-vs-consumer treatment — the OONI-residential vs DC-VPS diff is the first read;
+  Correction 3 rests on it.
 - Current Russian legal exposure for running a sensor / recruiting volunteers.
-- OONI + Censored Planet current API shapes before Phase 0 ingest.
-- Concrete transport enum must track amnezia-client's real transport set, not this draft's guess.
+- OONI + Censored Planet current API shapes, and which residential RU reachability tests are
+  populated for the operators of interest.
+- Concrete transport enum must track amnezia-client's real transport set, not the draft guess.
+- **Verdict vocabulary ↔ dpi-bench property vocabulary** — reconcile once dpi-bench firms up
+  (one-way pull into CONTRACT Part 1; not a blocker; dpi-bench is a separate session).
+- Name invariant: "Lokhotron"/лохотрон never appears in any client-facing artifact or contract
+  payload that reaches the client. Safe only because the trust boundary keeps it censor-facing.
 
 ## Next actions
 
-1. Stand up Phase 1's two VPSes + the probe battery and echo server.
-2. Decide sequencing: arguably finish `dpi-bench` Phase 1 first — it teaches the exact
-   capture/diff primitive on a safe target before pointing it at the live adversary.
+1. **Build Phase 1 step 0** — the netns/loopback fault-injection calibration harness (ECHO.md §7).
+   The first runnable thing; proves the pipeline against ground truth before spending on VPSes.
+2. Provision the RU/non-RU VPS pair; run the calibrated probe battery live.
+3. Stand up the OONI-residential vs DC-VPS reachability comparison and fold it into the Phase 1
+   write-up as the directional DC-vs-consumer gap read.
