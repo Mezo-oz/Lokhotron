@@ -1,0 +1,18 @@
+[Unit]
+Description=Lokhotron echo server (reverse-measurement endpoint)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/lokhotron-echo __LISTEN__
+Restart=always
+RestartSec=2
+# Port is >1024, so no privileges needed — run as a throwaway dynamic user, hardened.
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

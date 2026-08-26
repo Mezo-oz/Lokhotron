@@ -111,6 +111,8 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done + verified on the wire** (rig, root). |
 | Per-route control-TTL calibration | **Done + verified** — RST judged against measured ~64, not assumed. |
 | Run the netns rig under root (RST + throttle end-to-end) | **Passed** — all 4 cases PASS on real kernel-injected faults (WSL Ultramarine, 2026-08-26). |
+| Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
+| Provision + live run | **Operator step** — create hosts, RU legal check, run setup, fill tags. |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
 | Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
@@ -131,8 +133,13 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 
 ## Next actions
 
-1. **Build Phase 1 step 0** — the netns/loopback fault-injection calibration harness (ECHO.md §7).
-   The first runnable thing; proves the pipeline against ground truth before spending on VPSes.
-2. Provision the RU/non-RU VPS pair; run the calibrated probe battery live.
+1. ~~Build Phase 1 step 0 (calibration harness)~~ — **done + verified on the wire.**
+2. **Provision the RU/non-RU VPS pair and run the battery live.** The repeatable deploy is built
+   (`deploy/` — `server-setup.sh`, `sensor-setup.sh`, systemd units, `DEPLOY.md`). Remaining is
+   the part only the operator can do: create two hosts, do the **RU legal/risk check**, pick
+   providers, run the two setup scripts, fill in ASN/REGION. This is the week that tests the
+   thesis — watch the `timeout_indistinct` rate; a calibrated blank is now a real finding.
 3. Stand up the OONI-residential vs DC-VPS reachability comparison and fold it into the Phase 1
    write-up as the directional DC-vs-consumer gap read.
+4. (Phase 2, gated on the delta proving informative) reconcile the transport enum with
+   amnezia-client's real set; decide whether the bundle channel rides amnezia's config-update path.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Lokhotron sensor battery (one run)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lokhotron-run-battery
+# The AF_PACKET capture (injected-RST detection + TTL calibration) needs CAP_NET_RAW.
+# Runs as root by default, which has it. Hardened alternative: add a dedicated User= and keep
+# the two capability lines below so it runs with CAP_NET_RAW and nothing else.
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
