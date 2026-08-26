@@ -27,6 +27,14 @@ pub fn is_ttl_anomalous(rst_ttl: u8, control_ttl: u8) -> bool {
     rst_ttl.abs_diff(control_ttl) > TTL_ANOMALY_THRESHOLD
 }
 
+/// Parse an IPv4 packet's source address and TTL. Used to calibrate the clean-path TTL from
+/// the real peer (so the RST anomaly test compares against a *measured* TTL, not an assumed
+/// one). Pure.
+pub fn ipv4_src_and_ttl(ip_packet: &[u8]) -> Option<([u8; 4], u8)> {
+    let (ipv4, _rest) = etherparse::Ipv4Header::from_slice(ip_packet).ok()?;
+    Some((ipv4.source, ipv4.time_to_live))
+}
+
 /// Given a raw link-layer frame from [`AfPacketCapture`], return the IPv4 portion. Handles
 /// the common `AF_PACKET` case of an Ethernet header (`0x0800` ethertype) and the already-
 /// IPv4 case (cooked/loopback captures). Returns `None` for anything else.
@@ -135,6 +143,34 @@ mod afpacket {
             }
             Ok(None)
         }
+
+        /// Observe the TTL of the first inbound IPv4 packet from `peer` before `deadline` —
+        /// the clean-path TTL used to calibrate the RST anomaly threshold per route. Root-
+        /// gated capture; validated under the rig, the parsing it calls is unit-tested.
+        pub fn observe_peer_ttl(
+            &self,
+            peer: [u8; 4],
+            deadline: std::time::Instant,
+        ) -> io::Result<Option<u8>> {
+            let mut buf = [0u8; 2048];
+            while std::time::Instant::now() < deadline {
+                match self.recv(&mut buf) {
+                    Ok(n) => {
+                        if let Some(ip) = super::ipv4_from_frame(&buf[..n]) {
+                            if let Some((src, ttl)) = super::ipv4_src_and_ttl(ip) {
+                                if src == peer {
+                                    return Ok(Some(ttl));
+                                }
+                            }
+                        }
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) if e.kind() == io::ErrorKind::TimedOut => continue,
+                    Err(e) => return Err(e),
+                }
+            }
+            Ok(None)
+        }
     }
 
     impl Drop for AfPacketCapture {
@@ -191,6 +227,14 @@ mod tests {
         let syn = ipv4_tcp(64, 1, false);
         assert!(parse_ipv4_tcp_rst(&syn).is_none());
         assert!(parse_ipv4_tcp_rst(&[]).is_none());
+    }
+
+    #[test]
+    fn parses_source_and_ttl() {
+        let pkt = ipv4_tcp(57, 0x1234, false);
+        let (src, ttl) = ipv4_src_and_ttl(&pkt).expect("parse src+ttl");
+        assert_eq!(src, [10, 0, 0, 1]);
+        assert_eq!(ttl, 57);
     }
 
     #[test]

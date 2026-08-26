@@ -33,13 +33,18 @@ reads `timeout_indistinct` instead of masking); real bulk throughput → `thrott
 `DEFAULT_CONTROL_TTL`. The wiring is unit-tested with a fake reset; the live capture is the rig's
 RST case.
 
-**Caveats / not fully closed:** the on-wire RST path has been run only via the fake-reset unit
-test — the real AF_PACKET capture (rig RST case) has **not been executed here** (no root + no `tc`
-on this WSL box), so run `sudo rig/netns-calibrate.sh` on a suitable box to confirm end-to-end.
-`DEFAULT_CONTROL_TTL` is a fixed 64, not yet calibrated per route. `watch_for_rst` currently
-matches any RST in the namespace (no port filter) — fine in the isolated rig, needs a filter for
-shared vantages. `payload_mutated` still validated only synthetically; `WeightedBundle::verify_stub`
-is a placeholder (real ed25519 with the control plane, Phase 2).
+Control TTL is now **calibrated per route** (`calibrate_control_ttl`): the battery sends a UDP
+datagram to the peer and captures the echoed reply's TTL over the same path, judging the RST
+against that measured value; `DEFAULT_CONTROL_TTL` (64) is only a fallback when capture is
+unavailable.
+
+**Caveats / not fully closed:** the on-wire RST + calibration paths have been run only via unit
+tests (fake reset + pure TTL parsing) — the real AF_PACKET capture has **not been executed here**
+(no root + no `tc` on this WSL box), so run `sudo rig/netns-calibrate.sh` on a suitable box to
+confirm end-to-end. `watch_for_rst`/`observe_peer_ttl` match any packet from the peer in the
+namespace (no 5-tuple filter) — fine in the isolated rig, needs a filter for shared vantages.
+`payload_mutated` still validated only synthetically; `WeightedBundle::verify_stub` is a
+placeholder (real ed25519 with the control plane, Phase 2).
 
 ## Three-tree architecture (a security boundary, not tidiness)
 

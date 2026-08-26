@@ -24,9 +24,9 @@ pub const EXPECTED_BPS: u64 = 5_000_000;
 /// Bulk volume pushed through the TCP echo to measure throughput.
 const BULK_BYTES: usize = 256 * 1024;
 
-/// Assumed clean-path TTL for the route, against which an RST's TTL is compared to detect a
-/// forged (middlebox) RST. A real deployment calibrates this per route from a control
-/// connection; 64 is the common Linux default and what the netns rig uses.
+/// Fallback clean-path TTL, used only when per-route calibration ([`calibrate_control_ttl`])
+/// can't measure the real peer (no `CAP_NET_RAW`, or no reply). 64 is the common Linux
+/// default. The battery prefers a measured value.
 pub const DEFAULT_CONTROL_TTL: u8 = 64;
 
 fn resolve(addr: &str) -> Option<SocketAddr> {
@@ -263,13 +263,46 @@ pub fn measure_throughput(addr: &str) -> Option<u64> {
     Some(((got as f64) * 8.0 / secs) as u64)
 }
 
+/// Measure the clean-path TTL from the real peer, so the RST anomaly test compares against a
+/// value observed on *this* route rather than an assumed constant. Sends one UDP datagram to
+/// the server and captures the echoed reply's TTL. Linux + `CAP_NET_RAW`; falls back to
+/// [`DEFAULT_CONTROL_TTL`] when capture is unavailable or no reply is seen.
+#[cfg(target_os = "linux")]
+fn calibrate_control_ttl(udp_addr: &str) -> u8 {
+    fn measure(udp_addr: &str) -> Option<u8> {
+        let sa = resolve(udp_addr)?;
+        let peer = match sa.ip() {
+            std::net::IpAddr::V4(v4) => v4.octets(),
+            std::net::IpAddr::V6(_) => return None, // IPv6 calibration not modeled yet
+        };
+        let cap = lok_capture::AfPacketCapture::open().ok()?;
+        let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
+        sock.connect(sa).ok()?;
+        let mut buf = [0u8; 8];
+        buf[0..4].copy_from_slice(&0xC0_FF_EE_00u32.to_be_bytes()); // calibration nonce
+        // marker 0 already zero
+        sock.send(&buf).ok()?;
+        let deadline = Instant::now() + Duration::from_millis(400);
+        cap.observe_peer_ttl(peer, deadline).ok().flatten()
+    }
+    measure(udp_addr).unwrap_or(DEFAULT_CONTROL_TTL)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn calibrate_control_ttl(_udp_addr: &str) -> u8 {
+    DEFAULT_CONTROL_TTL
+}
+
 /// The real battery: run the UDP marked-echo delta, then probe the TCP path — filling
 /// `tcp_reachable` (blackout vs UDP-class kill), `rst` (on-wire `injected_rst_at_sni` via the
-/// capture), and `throughput_bps`/`expected_bps` (real `throttle_to_rate`). Uses the default
-/// TCP probe: capturing on Linux (root), plain otherwise.
+/// capture), and `throughput_bps`/`expected_bps` (real `throttle_to_rate`). The RST anomaly
+/// is judged against a control TTL calibrated per route from the real peer (falling back to
+/// [`DEFAULT_CONTROL_TTL`]). Uses the default TCP probe: capturing on Linux (root), plain
+/// otherwise.
 pub fn probe_battery(udp_addr: &str, tcp_addr: &str, count: u32) -> std::io::Result<Observation> {
     let tcp = default_tcp_probe();
-    probe_battery_with(udp_addr, tcp_addr, count, tcp.as_ref(), DEFAULT_CONTROL_TTL)
+    let control_ttl = calibrate_control_ttl(udp_addr);
+    probe_battery_with(udp_addr, tcp_addr, count, tcp.as_ref(), control_ttl)
 }
 
 /// [`probe_battery`] with an injectable TCP probe and control TTL, so the RST wiring can be
