@@ -1,0 +1,25 @@
+# Lokhotron workspace — sensing layer (tree #1). See DESIGN.md / ECHO.md.
+# Locked toolchain: edition 2021, sync + std threads (no async until the Phase 2/3
+# collector), AF_PACKET via libc parsed with etherparse, minimal deps.
+[workspace]
+resolver = "2"
+members = [
+    "crates/lok-contract",
+    "crates/echo-server",
+    "crates/probe",
+    "crates/lok-capture",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/Mezo-oz/Lokhotron"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+etherparse = "0.15"
+libc = "0.2"
+
+[profile.release]
+opt-level = 2

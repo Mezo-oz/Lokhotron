@@ -14,8 +14,22 @@ differential technique.
 
 ## Repo
 
-`github.com/Mezo-oz/Lokhotron` — public, MIT, docs-only so far (no code yet). Design settled;
-first build target is Phase 1.
+`github.com/Mezo-oz/Lokhotron` — public, MIT. Design settled; **Phase 1 scaffold built and
+verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **14 tests pass**
+(2 lok-contract + 2 lok-capture + 10 calibration incl. one real loopback end-to-end). Next
+increment: the TCP-handshake probe (see below).
+
+Crates: `lok-contract` (Verdict/Observation/Transport/TelemetryReport/WeightedBundle — types +
+`sample`/`verify_stub`), `echo-server` (marked-echo UDP; DropPolicy = calibration fault-emulation
+only), `probe` (`classify` pure fn + UDP `probe_once` + `tests/calibration.rs`), `lok-capture`
+(`AfPacketCapture` + `parse_ipv4_tcp_rst`), `rig/netns-calibrate.sh` (clean + UDP-drop cases run
+today; RST/throttle stubbed pending the TCP probe).
+
+**Deliberately stubbed (not done):** probe is UDP-only, so `tcp_reachable` is hardcoded `true`
+(a full UDP blackout currently misclassifies as `udp_class_drop`); no throughput measurement
+(`throttled` is synthetic-only); `injected_rst`/`payload_mutated` validated only via synthetic
+Observations; `WeightedBundle::verify_stub` is a placeholder (real ed25519 with the control
+plane); `AfPacketCapture` compiles but isn't wired to a live probe path.
 
 ## Three-tree architecture (a security boundary, not tidiness)
 
@@ -74,7 +88,8 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Phase | State |
 |---|---|
 | Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
-| Phase 1 **step 0** (local fault-injection calibration harness) | **Next.** Not started. |
+| Phase 1 **step 0** (calibration harness) | **Built + green** — 14 tests pass; netns rig clean+UDP-drop cases run. |
+| Phase 1 next increment (TCP-handshake probe + wire lok-capture + throughput) | **Next.** Not started. |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
 | Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
