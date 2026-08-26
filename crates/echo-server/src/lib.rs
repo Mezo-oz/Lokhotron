@@ -6,7 +6,8 @@
 //! netns/loopback harness inject a known `silent_drop_from_segment` so the classifier can
 //! be checked against ground truth. It has no place in a real deployment.
 
-use std::net::UdpSocket;
+use std::io::{Read, Write};
+use std::net::{TcpListener, UdpSocket};
 
 /// Fault-emulation policy. Real servers always run [`DropPolicy::None`].
 #[derive(Debug, Clone, Copy)]
@@ -51,4 +52,29 @@ pub fn serve(sock: UdpSocket, policy: DropPolicy) -> std::io::Result<()> {
             sock.send_to(datagram, peer)?;
         }
     }
+}
+
+/// Serve a TCP byte-echo on an already-bound listener until an error occurs. This is the
+/// far end for the probe's `tcp_reachable` check and its bulk-throughput measurement: a
+/// successful connect proves the TCP path is up; echoing bytes lets the probe time the
+/// round trip. Each connection is handled on its own thread (sync model, no async runtime).
+pub fn serve_tcp(listener: TcpListener) -> std::io::Result<()> {
+    for stream in listener.incoming() {
+        let mut stream = stream?;
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 4096];
+            loop {
+                match stream.read(&mut buf) {
+                    Ok(0) => break, // peer closed
+                    Ok(n) => {
+                        if stream.write_all(&buf[..n]).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+    }
+    Ok(())
 }

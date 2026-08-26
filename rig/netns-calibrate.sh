@@ -6,9 +6,10 @@
 # can be checked against KNOWN ground truth on real kernel path — the safety net that lets
 # you trust a live delta later (you can't tell a capture bug from a finding on the wire).
 #
-# Status: the clean case and the UDP silent-drop case run today. The RST and throttle cases
-# are stubbed pending the TCP-handshake probe (see STATUS.md / ECHO.md §7); their nftables /
-# tc recipes are noted inline so they're ready to enable the moment the probe lands.
+# Status: clean, UDP silent-drop, and throttle cases run today (the battery measures real
+# TCP reachability + throughput). The injected-RST case is stubbed pending one more step:
+# wiring lok-capture's watch_for_rst() into probe_battery so Observation.rst is populated on
+# the wire (root-gated). Its recipe is noted inline, ready to enable.
 #
 # Requires root (CAP_NET_ADMIN) and a kernel with netns + veth. Verified target: WSL2.
 set -euo pipefail
@@ -65,15 +66,30 @@ main() {
     trap cleanup EXIT
     setup
 
-    run_case "clean path"       ""  "ok"
+    run_case "clean path"         ""  "ok"
     run_case "drop from marker 4" "4" "silent_drop_from_segment"
 
-    # STUBBED until the TCP-handshake probe lands (ECHO.md §7):
-    #   RST injection:  ip netns exec $NS_B nft add rule ip filter input tcp dport $PORT reject with tcp reset
-    #                   -> expect injected_rst_at_sni (needs lok-capture wired + a distinct TTL)
-    #   Throttle:       ip netns exec $NS_B tc qdisc add dev $VETH_B root tbf rate 128kbit burst 4k latency 50ms
-    #                   -> expect throttle_to_rate (needs the bulk-throughput phase)
-    echo "(RST + throttle cases stubbed pending the TCP probe)"
+    # Throttle: rate-limit the server's egress so the TCP bulk-echo comes back far below
+    # EXPECTED_BPS. The battery measures the real rate and classifies throttle_to_rate.
+    echo "--- case: throttle to 128kbit (expect throttle_to_rate) ---"
+    ip netns exec "$NS_B" tc qdisc add dev "$VETH_B" root tbf rate 128kbit burst 4kb latency 50ms
+    ip netns exec "$NS_B" ./target/debug/echo-server "$IP_B:$PORT" &
+    srv=$!; sleep 0.3
+    out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
+    kill "$srv" 2>/dev/null || true
+    ip netns exec "$NS_B" tc qdisc del dev "$VETH_B" root 2>/dev/null || true
+    echo "  probe -> $out"
+    echo "$out" | grep -q '"kind":"throttle_to_rate"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
+
+    # STUBBED — injected RST. Needs watch_for_rst() wired into probe_battery (root capture),
+    # and an injector that sets a TTL distinct from the path so is_ttl_anomalous() fires
+    # (plain `nft ... reject with tcp reset` inherits the default TTL and won't look forged):
+    #   ip netns exec $NS_B nft -f - <<'NFT'
+    #     table ip lok { chain out { type filter hook output priority 0;
+    #       tcp sport $PORT ip ttl set 200 } }
+    #   NFT
+    #   + nft ... reject with tcp reset  -> expect injected_rst_at_sni
+    echo "(injected-RST case stubbed pending watch_for_rst wiring)"
 
     echo "calibration: OK"
 }

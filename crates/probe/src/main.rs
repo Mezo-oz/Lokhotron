@@ -17,7 +17,9 @@ fn main() -> ExitCode {
         }
     };
 
-    match probe::probe_once(&server, count) {
+    // Full battery: UDP marked-echo delta + real TCP reachability/throughput against the
+    // same address (UDP and TCP are separate namespaces).
+    match probe::probe_battery(&server, &server, count) {
         Ok(obs) => {
             let verdict = probe::classify(&obs);
             println!("{}", serde_json::to_string(&verdict).unwrap());

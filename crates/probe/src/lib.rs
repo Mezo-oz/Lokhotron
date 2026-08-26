@@ -8,13 +8,21 @@
 //! is stubbed `true`, and `injected_rst` / `payload_mutated` / `throttled` are exercised
 //! only via synthetic Observations until the TCP-handshake probe lands.
 
-use std::net::UdpSocket;
-use std::time::Duration;
+use std::io::{Read, Write};
+use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
+use std::time::{Duration, Instant};
 
 use lok_contract::{Observation, Transport, Verdict};
 
 /// Fraction of expected throughput below which the path is judged throttled.
 const THROTTLE_FRACTION: f64 = 0.5;
+
+/// Nominal healthy rate a transport is expected to sustain. Compared against measured
+/// throughput to detect `throttle_to_rate`. Coarse on purpose.
+pub const EXPECTED_BPS: u64 = 5_000_000;
+
+/// Bulk volume pushed through the TCP echo to measure throughput.
+const BULK_BYTES: usize = 256 * 1024;
 
 /// Decide the verdict from a single run's joined delta. Pure: same `Observation` in, same
 /// `Verdict` out. Derivation table lives in ECHO.md §5.
@@ -117,7 +125,7 @@ pub fn probe_once(server: &str, count: u32) -> std::io::Result<Observation> {
     Ok(Observation {
         transport: Transport::AmneziaWg, // UDP battery representative
         handshake_ok: highest.is_some(),
-        tcp_reachable: true, // STUB until the TCP-handshake probe lands
+        tcp_reachable: true, // UDP-only entry point assumes the path; probe_battery measures it
         segments_sent: count,
         highest_marker_arrived: highest,
         payload_hash_mismatch: false,
@@ -126,4 +134,74 @@ pub fn probe_once(server: &str, count: u32) -> std::io::Result<Observation> {
         expected_bps: None,
         active_probe_forwarded: false,
     })
+}
+
+/// Attempt a real TCP handshake to `addr`. A success means the TCP path is up — which is
+/// what separates a *total blackout* from a *UDP-class kill* (UDP dead, TCP alive).
+pub fn tcp_reachable(addr: &str) -> bool {
+    let Ok(mut resolved) = addr.to_socket_addrs() else {
+        return false;
+    };
+    let Some(sa) = resolved.next() else {
+        return false;
+    };
+    TcpStream::connect_timeout(&sa, Duration::from_millis(500)).is_ok()
+}
+
+/// Push `BULK_BYTES` through the TCP echo and time the round trip, returning bits/sec.
+/// A concurrent writer thread avoids the send/recv deadlock on a full socket buffer.
+/// `None` if the connection fails or nothing echoes back.
+pub fn measure_throughput(addr: &str) -> Option<u64> {
+    let stream = TcpStream::connect(addr).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    let mut reader = stream.try_clone().ok()?;
+    let mut writer = stream;
+
+    let start = Instant::now();
+    let writer_thread = std::thread::spawn(move || {
+        let chunk = [0x5Au8; 4096];
+        let mut left = BULK_BYTES;
+        while left > 0 {
+            let n = left.min(chunk.len());
+            if writer.write_all(&chunk[..n]).is_err() {
+                break;
+            }
+            left -= n;
+        }
+        let _ = writer.flush();
+        let _ = writer.shutdown(std::net::Shutdown::Write);
+    });
+
+    let mut got = 0usize;
+    let mut buf = [0u8; 8192];
+    while got < BULK_BYTES {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => got += n,
+            Err(_) => break,
+        }
+    }
+    let _ = writer_thread.join();
+
+    let secs = start.elapsed().as_secs_f64();
+    if secs <= 0.0 || got == 0 {
+        return None;
+    }
+    Some(((got as f64) * 8.0 / secs) as u64)
+}
+
+/// The real battery: run the UDP marked-echo delta, then measure the TCP path for real —
+/// filling `tcp_reachable` (blackout vs UDP-class kill) and `throughput_bps`/`expected_bps`
+/// (real `throttle_to_rate`) instead of the UDP-only stubs. `injected_rst` still requires
+/// the AF_PACKET RST watcher wired in under the calibration rig (root); see `lok-capture`.
+pub fn probe_battery(udp_addr: &str, tcp_addr: &str, count: u32) -> std::io::Result<Observation> {
+    let mut obs = probe_once(udp_addr, count)?;
+    obs.tcp_reachable = tcp_reachable(tcp_addr);
+    if obs.tcp_reachable {
+        if let Some(bps) = measure_throughput(tcp_addr) {
+            obs.throughput_bps = Some(bps);
+            obs.expected_bps = Some(EXPECTED_BPS);
+        }
+    }
+    Ok(obs)
 }

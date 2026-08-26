@@ -5,12 +5,12 @@
 //! with a known drop policy — proving probe + classifier agree on ground truth end-to-end.
 //! Every verdict path added to the taxonomy gets a case here before it is trusted live.
 
-use std::net::UdpSocket;
+use std::net::{TcpListener, UdpSocket};
 use std::thread;
 
-use echo_server::{serve, DropPolicy};
+use echo_server::{serve, serve_tcp, DropPolicy};
 use lok_contract::{Observation, RstInfo, Transport, Verdict};
-use probe::{classify, probe_once};
+use probe::{classify, measure_throughput, probe_battery, probe_once, tcp_reachable};
 
 #[test]
 fn clean_path_is_ok() {
@@ -93,4 +93,58 @@ fn loopback_real_drop_recovers_silent_drop() {
 
     let obs = probe_once(&addr.to_string(), 8).expect("probe run");
     assert_eq!(classify(&obs), Verdict::SilentDropFromSegment { n: 4 });
+}
+
+/// Spin up a full echo endpoint (UDP marked-echo + TCP byte-echo) on one address and return
+/// it. `drop` applies to the UDP side only.
+fn spawn_echo(drop: DropPolicy) -> String {
+    let udp = UdpSocket::bind("127.0.0.1:0").expect("bind udp");
+    let addr = udp.local_addr().unwrap();
+    let tcp = TcpListener::bind(addr).expect("bind tcp same port");
+    thread::spawn(move || {
+        let _ = serve(udp, drop);
+    });
+    thread::spawn(move || {
+        let _ = serve_tcp(tcp);
+    });
+    addr.to_string()
+}
+
+#[test]
+fn tcp_reachable_true_when_listener_up_false_when_not() {
+    let addr = spawn_echo(DropPolicy::None);
+    assert!(tcp_reachable(&addr));
+    // An address with no listener: reserve a port, drop the listener, then probe it.
+    let dead = TcpListener::bind("127.0.0.1:0").unwrap();
+    let dead_addr = dead.local_addr().unwrap().to_string();
+    drop(dead);
+    assert!(!tcp_reachable(&dead_addr));
+}
+
+#[test]
+fn throughput_measures_a_positive_rate() {
+    let addr = spawn_echo(DropPolicy::None);
+    let bps = measure_throughput(&addr).expect("some throughput on loopback");
+    assert!(bps > 0);
+}
+
+/// The key fix: UDP fully blackout while TCP is up must classify as `udp_class_drop`, not
+/// be masked by a stubbed `tcp_reachable`. Uses the real battery against a real endpoint.
+#[test]
+fn battery_udp_blackout_tcp_up_is_udp_class_drop() {
+    let addr = spawn_echo(DropPolicy::DropFromMarker(0)); // drop every UDP marker
+    let obs = probe_battery(&addr, &addr, 8).expect("battery run");
+    assert!(obs.tcp_reachable, "TCP echo is up, so reachable must be measured true");
+    assert_eq!(obs.highest_marker_arrived, None, "no UDP marker survived");
+    assert_eq!(classify(&obs), Verdict::UdpClassDrop);
+}
+
+/// A healthy battery run (UDP all-arrive, TCP up, loopback throughput far above expected)
+/// classifies as Ok — throughput does not trip a false `throttled`.
+#[test]
+fn battery_clean_path_is_ok() {
+    let addr = spawn_echo(DropPolicy::None);
+    let obs = probe_battery(&addr, &addr, 8).expect("battery run");
+    assert!(obs.tcp_reachable);
+    assert_eq!(classify(&obs), Verdict::Ok);
 }
