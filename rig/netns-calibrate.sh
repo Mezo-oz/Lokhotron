@@ -6,10 +6,9 @@
 # can be checked against KNOWN ground truth on real kernel path — the safety net that lets
 # you trust a live delta later (you can't tell a capture bug from a finding on the wire).
 #
-# Status: clean, UDP silent-drop, and throttle cases run today (the battery measures real
-# TCP reachability + throughput). The injected-RST case is stubbed pending one more step:
-# wiring lok-capture's watch_for_rst() into probe_battery so Observation.rst is populated on
-# the wire (root-gated). Its recipe is noted inline, ready to enable.
+# Status: clean, UDP silent-drop, throttle, and injected-RST cases all run today. The battery
+# measures real TCP reachability + throughput, and (Linux+root) runs an AF_PACKET capture
+# during the handshake so a reset with an anomalous TTL is recovered as injected_rst_at_sni.
 #
 # Requires root (CAP_NET_ADMIN) and a kernel with netns + veth. Verified target: WSL2.
 set -euo pipefail
@@ -81,15 +80,27 @@ main() {
     echo "  probe -> $out"
     echo "$out" | grep -q '"kind":"throttle_to_rate"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
 
-    # STUBBED — injected RST. Needs watch_for_rst() wired into probe_battery (root capture),
-    # and an injector that sets a TTL distinct from the path so is_ttl_anomalous() fires
-    # (plain `nft ... reject with tcp reset` inherits the default TTL and won't look forged):
-    #   ip netns exec $NS_B nft -f - <<'NFT'
-    #     table ip lok { chain out { type filter hook output priority 0;
-    #       tcp sport $PORT ip ttl set 200 } }
-    #   NFT
-    #   + nft ... reject with tcp reset  -> expect injected_rst_at_sni
-    echo "(injected-RST case stubbed pending watch_for_rst wiring)"
+    # Injected RST: no TCP listener on the server side, so a connect is refused with a RST;
+    # mangle that RST's TTL to 200 (distinct from the 1-hop path's ~64) so is_ttl_anomalous()
+    # fires. The battery's AF_PACKET capture on the sensor side recovers it. Requires nftables.
+    echo "--- case: injected RST with anomalous TTL (expect injected_rst_at_sni) ---"
+    ip netns exec "$NS_B" nft -f - <<NFT
+table ip lok {
+    chain out {
+        type filter hook output priority mangle;
+        tcp sport $PORT tcp flags rst ip ttl set 200
+    }
+}
+NFT
+    # UDP echo only (LOK_NO_TCP); TCP has no listener -> connect refused -> mangled RST.
+    ip netns exec "$NS_B" env LOK_NO_TCP=1 ./target/debug/echo-server "$IP_B:$PORT" 2>/dev/null &
+    srv=$!; sleep 0.3
+    # probe runs the battery; capture needs root, which we have inside the rig.
+    out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
+    kill "$srv" 2>/dev/null || true
+    ip netns exec "$NS_B" nft delete table ip lok 2>/dev/null || true
+    echo "  probe -> $out"
+    echo "$out" | grep -q '"kind":"injected_rst_at_sni"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
 
     echo "calibration: OK"
 }

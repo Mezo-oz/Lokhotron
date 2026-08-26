@@ -10,7 +10,22 @@ use std::thread;
 
 use echo_server::{serve, serve_tcp, DropPolicy};
 use lok_contract::{Observation, RstInfo, Transport, Verdict};
-use probe::{classify, measure_throughput, probe_battery, probe_once, tcp_reachable};
+use probe::{
+    classify, measure_throughput, probe_battery, probe_battery_with, probe_once, tcp_reachable,
+    TcpProbe, TcpProbeResult,
+};
+
+/// A TCP probe that pretends the connection was reset by a middlebox with an anomalous TTL —
+/// stands in for the root-gated AF_PACKET capture so the RST wiring is testable without root.
+struct FakeReset;
+impl TcpProbe for FakeReset {
+    fn run(&self, _tcp_addr: &str, _control_ttl: u8) -> TcpProbeResult {
+        TcpProbeResult {
+            reachable: false,
+            rst: Some(RstInfo { ttl: 200, ip_id: 0xBEEF, ttl_anomaly: true }),
+        }
+    }
+}
 
 #[test]
 fn clean_path_is_ok() {
@@ -147,4 +162,17 @@ fn battery_clean_path_is_ok() {
     let obs = probe_battery(&addr, &addr, 8).expect("battery run");
     assert!(obs.tcp_reachable);
     assert_eq!(classify(&obs), Verdict::Ok);
+}
+
+/// The RST wiring: an injected reset with an anomalous TTL, observed by the TCP probe, must
+/// flow through `probe_battery_with` into `Observation.rst` and classify as
+/// `injected_rst_at_sni` — regardless of the UDP delta. Uses a fake reset to stand in for
+/// the root-gated capture; the real capture path is the netns rig's RST case.
+#[test]
+fn battery_injected_rst_classifies_on_wire() {
+    let addr = spawn_echo(DropPolicy::None); // UDP would be clean; the RST must still win
+    let obs = probe_battery_with(&addr, &addr, 8, &FakeReset, 64).expect("battery run");
+    assert_eq!(obs.rst.map(|r| r.ttl_anomaly), Some(true));
+    assert!(!obs.tcp_reachable, "a reset connection is not reachable");
+    assert_eq!(classify(&obs), Verdict::InjectedRstAtSni);
 }

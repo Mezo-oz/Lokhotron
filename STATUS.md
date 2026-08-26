@@ -25,15 +25,21 @@ calibration fault-emulation only), `probe` (`classify` pure fn; UDP `probe_once`
 (`AfPacketCapture` + `watch_for_rst` + `parse_ipv4_tcp_rst` + `ipv4_from_frame` + `is_ttl_anomalous`),
 `rig/netns-calibrate.sh` (clean + UDP-drop + **throttle** run today; RST stubbed).
 
-**Closed this increment:** real `tcp_reachable` (a full UDP blackout with TCP up now correctly
-reads `udp_class_drop`, and TCP-down reads `timeout_indistinct` instead of masking); real bulk
-throughput → `throttle_to_rate`; RST frame-strip + TTL-anomaly parsing (`is_ttl_anomalous`,
-`ipv4_from_frame`) unit-tested; `watch_for_rst` capture loop implemented (root-gated).
+**Closed:** real `tcp_reachable` (a full UDP blackout with TCP up reads `udp_class_drop`; TCP-down
+reads `timeout_indistinct` instead of masking); real bulk throughput → `throttle_to_rate`; and
+**`injected_rst_at_sni` on the wire** — `watch_for_rst` is wired into `probe_battery` behind a
+`TcpProbe` seam (`CapturingTcpProbe` on Linux+root, degrades to `PlainTcpProbe` without
+`CAP_NET_RAW`), populating `Observation.rst` from a captured RST whose TTL is judged against
+`DEFAULT_CONTROL_TTL`. The wiring is unit-tested with a fake reset; the live capture is the rig's
+RST case.
 
-**Still stubbed (not done):** `injected_rst_at_sni` on the wire — `watch_for_rst` is not yet
-wired into `probe_battery` to populate `Observation.rst` during the TCP connect (needs root; rig
-RST case + a TTL-distinct injector wait on it); `payload_mutated` validated only synthetically;
-`WeightedBundle::verify_stub` is a placeholder (real ed25519 with the control plane, Phase 2).
+**Caveats / not fully closed:** the on-wire RST path has been run only via the fake-reset unit
+test — the real AF_PACKET capture (rig RST case) has **not been executed here** (no root + no `tc`
+on this WSL box), so run `sudo rig/netns-calibrate.sh` on a suitable box to confirm end-to-end.
+`DEFAULT_CONTROL_TTL` is a fixed 64, not yet calibrated per route. `watch_for_rst` currently
+matches any RST in the namespace (no port filter) — fine in the isolated rig, needs a filter for
+shared vantages. `payload_mutated` still validated only synthetically; `WeightedBundle::verify_stub`
+is a placeholder (real ed25519 with the control plane, Phase 2).
 
 ## Three-tree architecture (a security boundary, not tidiness)
 
@@ -92,9 +98,10 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Phase | State |
 |---|---|
 | Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
-| Phase 1 **step 0** (calibration harness) | **Built + green** — 20 tests pass; netns rig clean+UDP-drop+throttle cases run. |
+| Phase 1 **step 0** (calibration harness) | **Built + green** — 21 tests pass. |
 | Phase 1 TCP increment (real reachability + throughput) | **Done + green.** |
-| Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Next.** Root-gated; enables the rig RST case. |
+| Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done.** Wiring unit-tested (fake reset → `injected_rst_at_sni`); real capture runs under the rig. |
+| Run the netns rig under root (RST + throttle end-to-end) | **Not yet run here** — needs root + `tc`; this WSL box has neither. |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
 | Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |

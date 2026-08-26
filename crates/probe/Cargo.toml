@@ -16,6 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 lok-contract = { path = "../lok-contract" }
+lok-capture = { path = "../lok-capture" }
 serde_json = { workspace = true }
 
 [dev-dependencies]

@@ -28,20 +28,25 @@ fn main() -> ExitCode {
         }
     };
     // TCP byte-echo on the same address (separate namespace) for reachability + throughput.
-    let tcp = match TcpListener::bind(&addr) {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("bind tcp {addr}: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
-    std::thread::spawn(move || {
-        if let Err(e) = serve_tcp(tcp) {
-            eprintln!("serve_tcp: {e}");
-        }
-    });
+    // Set LOK_NO_TCP=1 to leave TCP unserved — used by the rig's injected-RST case, where a
+    // refused connect is what produces the RST.
+    let serve_tcp_side = std::env::var_os("LOK_NO_TCP").is_none();
+    if serve_tcp_side {
+        let tcp = match TcpListener::bind(&addr) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("bind tcp {addr}: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+        std::thread::spawn(move || {
+            if let Err(e) = serve_tcp(tcp) {
+                eprintln!("serve_tcp: {e}");
+            }
+        });
+    }
 
-    eprintln!("echo-server on {addr} (udp+tcp) policy={policy:?}");
+    eprintln!("echo-server on {addr} (udp{}) policy={policy:?}", if serve_tcp_side { "+tcp" } else { "" });
     if let Err(e) = serve(sock, policy) {
         eprintln!("serve: {e}");
         return ExitCode::FAILURE;
