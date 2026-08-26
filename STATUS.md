@@ -38,13 +38,16 @@ datagram to the peer and captures the echoed reply's TTL over the same path, jud
 against that measured value; `DEFAULT_CONTROL_TTL` (64) is only a fallback when capture is
 unavailable.
 
-**Caveats / not fully closed:** the on-wire RST + calibration paths have been run only via unit
-tests (fake reset + pure TTL parsing) — the real AF_PACKET capture has **not been executed here**
-(no root + no `tc` on this WSL box), so run `sudo rig/netns-calibrate.sh` on a suitable box to
-confirm end-to-end. `watch_for_rst`/`observe_peer_ttl` match any packet from the peer in the
-namespace (no 5-tuple filter) — fine in the isolated rig, needs a filter for shared vantages.
-`payload_mutated` still validated only synthetically; `WeightedBundle::verify_stub` is a
-placeholder (real ed25519 with the control plane, Phase 2).
+**Verified end-to-end on real packets** (`sudo rig/netns-calibrate.sh`, WSL Ultramarine): clean →
+`ok`; drop-from-4 → `silent_drop_from_segment{n:4}`; `tc tbf` 128 kbit → `throttle_to_rate`
+(measured ~124 kbit); `nft`-mangled RST (TTL 200) → `injected_rst_at_sni` (judged against the
+calibrated ~64). All four PASS.
+
+**Caveats / not fully closed:** `watch_for_rst`/`observe_peer_ttl` match any packet from the peer
+in the namespace (no 5-tuple filter) — fine in the isolated rig, needs a filter for shared
+vantages. `payload_mutated` still validated only synthetically (no on-wire injector yet).
+`WeightedBundle::verify_stub` is a placeholder (real ed25519 with the control plane, Phase 2).
+This is all still **lab** ground-truth — the next real milestone is a live RU/non-RU VPS pair.
 
 ## Three-tree architecture (a security boundary, not tidiness)
 
@@ -105,8 +108,9 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
 | Phase 1 **step 0** (calibration harness) | **Built + green** — 21 tests pass. |
 | Phase 1 TCP increment (real reachability + throughput) | **Done + green.** |
-| Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done.** Wiring unit-tested (fake reset → `injected_rst_at_sni`); real capture runs under the rig. |
-| Run the netns rig under root (RST + throttle end-to-end) | **Not yet run here** — needs root + `tc`; this WSL box has neither. |
+| Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done + verified on the wire** (rig, root). |
+| Per-route control-TTL calibration | **Done + verified** — RST judged against measured ~64, not assumed. |
+| Run the netns rig under root (RST + throttle end-to-end) | **Passed** — all 4 cases PASS on real kernel-injected faults (WSL Ultramarine, 2026-08-26). |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
 | Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
