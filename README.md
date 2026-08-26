@@ -38,4 +38,4 @@ downstream phase is justified by what Phase 1 actually finds.
 
 ## License
 
-TBD — pick before first non-doc commit.
+MIT — see [LICENSE](LICENSE). Matches dpi-bench, same world.
