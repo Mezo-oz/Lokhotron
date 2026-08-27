@@ -210,7 +210,13 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
    providers is itself the Correction 3 result, measured on our own instrument instead of inferred
    from OONI.
 
-5. **Fold the results back.** Feed the live numbers into `phase0/ooni_gap.py --dc-measurements` for
+5. **Fold the results back.** A draft write-up already exists at
+   [writeups/net4people-2026-08-draft.md](writeups/net4people-2026-08-draft.md) — it covers the
+   calibrated instrument and the Phase 0 read, with the live-run sections marked *(pending)*. It is
+   postable **now** as a method-critique post (getting the TTL-anomaly test and the verdict
+   vocabulary reviewed before spending the week is worth more than posting after), or after the run
+   with the results filled in. Either way read its "notes for the author" first: the provider-naming
+   call, and that publishing is the layer carrying the RU legal exposure. Feed the live numbers into `phase0/ooni_gap.py --dc-measurements` for
    the apples-to-apples consumer-vs-our-DC comparison DESIGN.md actually asks for, and write up
    Phase 1 with the claim scoped to *this provider's* DC path plus the OONI comparison as the
    directional gap read. Publishable on its own (net4people).
