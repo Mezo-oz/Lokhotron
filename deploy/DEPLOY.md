@@ -29,10 +29,17 @@ blindness. That two-sided honesty is what you're buying with the $10 and the ris
    providers** rather than one — still inside the ~$10/mo envelope, and a single box cannot be
    called representative. Re-run `python phase0/ooni_gap.py` first; the picture is month-specific
    and a provider that looks clean today may be filtered by the time you rent.
-2. **Legal / risk check for the RU box.** Verify current Russian legal exposure for running a
-   measurement sensor before you create it — this is in the "verify before hardening" list and it
-   changes. A VPS under your own name is lower human-risk than a volunteer's device, but it is
-   still your call to accept. Don't skip this step.
+2. **Legal / sanctions check for the RU box — [LEGAL-RU.md](LEGAL-RU.md).** Done as a research
+   pass on 2026-08-27; read it before you create anything, and re-read it at rent time because the
+   law moves several times a year. The short version: the sensing layer's Russian-law exposure is
+   low *because* the battery only ever talks to a host we own (keep it that way — Art. 274.1 is
+   where third-party probing would land), the real Russian exposure sits on the **publishing** side
+   under the March 2024 ban on disseminating circumvention information, and the sharpest near-term
+   risk is **American**: OFAC designated the Russian hoster Aeza Group in July 2025, transacting
+   with an SDN is strict liability, and `phase0/asn_classes.json` will happily classify a
+   sanctioned provider as a perfectly good vantage. **OFAC-screen the provider before you pay.**
+   A VPS under your own name is lower human-risk than a volunteer's device, but it is still your
+   call to accept. Don't skip this step, and don't rent under false details.
 3. **A port.** One UDP+TCP port for the echo server (default `47017`). Open it in the host
    firewall **and** the provider security group.
 

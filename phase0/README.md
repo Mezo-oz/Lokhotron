@@ -45,6 +45,15 @@ your DC VPS and diff them"). Format: `{"psiphon": {"anomaly": 12, "ok": 88}, ...
 - **Per-ASN detail on the DC side.** The hosting bucket is small and wildly heterogeneous, and
   pooling it hides precisely what Correction 3 is about.
 
+## Classification is not procurement clearance
+
+This tool answers "is this ASN a datacenter vantage?" It does **not** answer "may we lawfully buy
+from them?" Those come apart: OFAC designated the Russian hoster **Aeza Group** in July 2025, and
+`aeza` sits in this directory's hosting keyword list — the classifier would happily call it a good
+DC vantage. For a US-operated project, transacting with an SDN is strict liability. Screen any
+provider you intend to *rent* against the OFAC SDN list first; see
+[deploy/LEGAL-RU.md](../deploy/LEGAL-RU.md).
+
 ## What it cannot say
 
 These are tool/endpoint reachability tests, not the VPN-protocol handshake shaping Lokhotron

@@ -148,7 +148,17 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
   that a VPS is a lenient sensor — it may be an unrelated one. **Consequence: which RU provider you
   rent decides what you can measure.** Re-run the read before provisioning; the picture is
   month-specific.
-- Current Russian legal exposure for running a sensor / recruiting volunteers.
+- ~~Current Russian legal exposure for running a sensor / recruiting volunteers~~ — **research
+  pass done** (2026-08-27, [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md); not legal advice, re-read at
+  rent time). Sensing-layer RU exposure is low *conditional on a hard rule*: the battery only ever
+  targets a host we own (third-party probing is where Art. 274.1, 2-6 years, would land). The real
+  RU exposure is on the **publishing** side (March 2024 dissemination ban; 8,700+ sites blocked by
+  Apr 2025; Roskomsvoboda designated a foreign agent and shut down Sept 2025) — which is exactly
+  what the three-tree split isolates. **Sharpest near-term risk is US sanctions, not RU law:** OFAC
+  designated RU hoster **Aeza Group** on 2025-07-01, SDN transactions are strict liability, and
+  `phase0/asn_classes.json` lists `aeza` as a hosting brand — measurement-eligible is not
+  procurement-eligible. OFAC-screen every candidate provider before paying. Volunteer recruitment
+  stays deferred to Phase 3 client-as-sensor.
 - ~~OONI current API shapes / which RU reachability tests are populated~~ — **answered**
   (`api.ooni.io/api/v1/aggregation`, `axis_x=probe_asn`, live and well-populated: psiphon 79k,
   telegram 45k, tor 45k, torsf 1.2k, riseupvpn 322 over 30 days; `vanilla_tor` unusable, ~95%
