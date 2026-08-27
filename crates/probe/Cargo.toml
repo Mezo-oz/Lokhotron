@@ -19,5 +19,9 @@ lok-contract = { path = "../lok-contract" }
 lok-capture = { path = "../lok-capture" }
 serde_json = { workspace = true }
 
+# Bind-before-connect (to know our own port before the capture opens) has no std API.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }
+
 [dev-dependencies]
 echo-server = { path = "../echo-server" }

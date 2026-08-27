@@ -1,12 +1,12 @@
 //! The RU-side sensor.
 //!
 //! [`classify`] is a **pure function** of the joined delta — no I/O, fully unit-testable,
-//! and the single place a verdict is decided. [`probe_once`] performs the live UDP battery
-//! run and builds the [`Observation`] that feeds it.
+//! and the single place a verdict is decided. [`probe_battery`] performs the live run
+//! (UDP marked-echo + TCP handshake/throughput) and builds the [`Observation`] that feeds it.
 //!
-//! Current limits (see STATUS.md / ECHO.md): the battery is UDP-only, so `tcp_reachable`
-//! is stubbed `true`, and `injected_rst` / `payload_mutated` / `throttled` are exercised
-//! only via synthetic Observations until the TCP-handshake probe lands.
+//! Every capture the battery runs is scoped to a [`FlowFilter`] built from a socket the
+//! probe bound *before* opening the capture, so a packet from an unrelated flow on the same
+//! box can never be read as a measurement of this path (see lok-capture's module docs).
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
@@ -29,8 +29,61 @@ const BULK_BYTES: usize = 256 * 1024;
 /// default. The battery prefers a measured value.
 pub const DEFAULT_CONTROL_TTL: u8 = 64;
 
+/// Bytes of known payload carried after each datagram's `[nonce][marker]` header. This is
+/// what makes `payload_mutated` observable: the server echoes verbatim, so any difference
+/// between what was sent and what came back happened *in flight*.
+pub const PROBE_PAYLOAD_LEN: usize = 32;
+
+/// Nonce marking a datagram as this probe's. A mutation that rewrites the nonce or marker
+/// is not detected as `payload_mutated` — the datagram stops being recognizable as ours and
+/// reads as a drop instead. Detecting header rewrites needs the keyed-marker scheme in
+/// ECHO.md §4; the flagged verdict here is strictly *payload* mutation.
+const NONCE: u32 = 0xA1B2_C3D4;
+
+/// Nonce for the TTL-calibration datagram, kept distinct so it is never counted as a marker
+/// observation.
+const CALIBRATION_NONCE: u32 = 0xC0FF_EE00;
+
+/// The known payload for `marker` — deterministic, so the probe can recompute what it sent
+/// and compare byte for byte without keeping the sent buffers around. Varies per marker so
+/// a middlebox replaying one segment's bytes into another's slot is still a mismatch.
+pub fn payload_for(marker: u32) -> [u8; PROBE_PAYLOAD_LEN] {
+    let mut out = [0u8; PROBE_PAYLOAD_LEN];
+    for (i, b) in out.iter_mut().enumerate() {
+        *b = (marker as u8)
+            .wrapping_mul(31)
+            .wrapping_add((i as u8).wrapping_mul(7))
+            .wrapping_add(0x5A);
+    }
+    out
+}
+
+/// Build one probe datagram: `[nonce BE][marker BE][known payload]`.
+fn datagram_for(nonce: u32, marker: u32) -> [u8; 8 + PROBE_PAYLOAD_LEN] {
+    let mut buf = [0u8; 8 + PROBE_PAYLOAD_LEN];
+    buf[0..4].copy_from_slice(&nonce.to_be_bytes());
+    buf[4..8].copy_from_slice(&marker.to_be_bytes());
+    buf[8..].copy_from_slice(&payload_for(marker));
+    buf
+}
+
+/// Whether an echoed datagram's payload is exactly what was sent for that marker. A short
+/// or long echo counts as mutated: the bytes that came back are not the bytes that went out.
+pub fn payload_intact(echo: &[u8], marker: u32) -> bool {
+    echo.len() == 8 + PROBE_PAYLOAD_LEN && echo[8..] == payload_for(marker)
+}
+
 fn resolve(addr: &str) -> Option<SocketAddr> {
     addr.to_socket_addrs().ok()?.next()
+}
+
+/// The peer's IPv4 address and port, for building a capture [`FlowFilter`]. `None` for a
+/// name that resolves to IPv6 — the capture path models IPv4 only today.
+fn peer_v4(addr: &str) -> Option<([u8; 4], u16)> {
+    match resolve(addr)? {
+        SocketAddr::V4(v4) => Some((v4.ip().octets(), v4.port())),
+        SocketAddr::V6(_) => None,
+    }
 }
 
 /// Decide the verdict from a single run's joined delta. Pure: same `Observation` in, same
@@ -90,30 +143,32 @@ pub fn classify(obs: &Observation) -> Verdict {
 }
 
 /// Run one UDP marked-echo battery against `server` with `count` datagrams, and build the
-/// resulting [`Observation`]. Datagram layout matches the echo server: `[nonce][marker]`.
+/// resulting [`Observation`]. Datagram layout matches the echo server:
+/// `[nonce][marker][known payload]`. An echo whose payload differs from what was sent sets
+/// `payload_hash_mismatch` — the on-wire signal for `payload_mutated`.
 pub fn probe_once(server: &str, count: u32) -> std::io::Result<Observation> {
-    const NONCE: u32 = 0xA1B2_C3D4;
-
     let sock = UdpSocket::bind("0.0.0.0:0")?;
     sock.connect(server)?;
     sock.set_read_timeout(Some(Duration::from_millis(300)))?;
 
     for marker in 0..count {
-        let mut buf = [0u8; 8];
-        buf[0..4].copy_from_slice(&NONCE.to_be_bytes());
-        buf[4..8].copy_from_slice(&marker.to_be_bytes());
-        sock.send(&buf)?;
+        sock.send(&datagram_for(NONCE, marker))?;
     }
 
     let mut arrived = vec![false; count as usize];
-    let mut recv = [0u8; 64];
+    let mut mutated = false;
+    let mut recv = [0u8; 2048];
     loop {
         match sock.recv(&mut recv) {
             Ok(n) if n >= 8 => {
-                let rn = u32::from_be_bytes(recv[0..4].try_into().unwrap());
-                let rm = u32::from_be_bytes(recv[4..8].try_into().unwrap());
+                let echo = &recv[..n];
+                let rn = u32::from_be_bytes(echo[0..4].try_into().unwrap());
+                let rm = u32::from_be_bytes(echo[4..8].try_into().unwrap());
                 if rn == NONCE && (rm as usize) < arrived.len() {
                     arrived[rm as usize] = true;
+                    if !payload_intact(echo, rm) {
+                        mutated = true;
+                    }
                 }
             }
             Ok(_) => {}
@@ -137,7 +192,7 @@ pub fn probe_once(server: &str, count: u32) -> std::io::Result<Observation> {
         tcp_reachable: true, // UDP-only entry point assumes the path; probe_battery measures it
         segments_sent: count,
         highest_marker_arrived: highest,
-        payload_hash_mismatch: false,
+        payload_hash_mismatch: mutated,
         rst: None,
         throughput_bps: None,
         expected_bps: None,
@@ -180,28 +235,155 @@ impl TcpProbe for PlainTcpProbe {
     }
 }
 
+/// A TCP socket bound to an ephemeral port *before* it connects, so the probe knows its own
+/// port in advance and can scope the capture to the exact 5-tuple. `std` has no
+/// bind-then-connect for TCP, hence the direct syscalls.
+#[cfg(target_os = "linux")]
+mod boundsock {
+    use std::io;
+    use std::net::SocketAddrV4;
+    use std::time::Duration;
+
+    pub struct BoundTcpSocket {
+        fd: libc::c_int,
+    }
+
+    fn sockaddr_in(addr: SocketAddrV4) -> libc::sockaddr_in {
+        let mut sa: libc::sockaddr_in = unsafe { std::mem::zeroed() };
+        sa.sin_family = libc::AF_INET as libc::sa_family_t;
+        sa.sin_port = addr.port().to_be();
+        sa.sin_addr = libc::in_addr { s_addr: u32::from_ne_bytes(addr.ip().octets()) };
+        sa
+    }
+
+    impl BoundTcpSocket {
+        /// Open a TCP socket and bind it to an ephemeral port on all interfaces.
+        pub fn new() -> io::Result<Self> {
+            let fd = unsafe {
+                libc::socket(libc::AF_INET, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0)
+            };
+            if fd < 0 {
+                return Err(io::Error::last_os_error());
+            }
+            let me = Self { fd };
+            let sa = sockaddr_in(SocketAddrV4::new(std::net::Ipv4Addr::UNSPECIFIED, 0));
+            let rc = unsafe {
+                libc::bind(
+                    fd,
+                    &sa as *const libc::sockaddr_in as *const libc::sockaddr,
+                    std::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t,
+                )
+            };
+            if rc != 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(me)
+        }
+
+        /// The bound local port — the one the peer's replies (and any RST) are addressed to.
+        pub fn local_port(&self) -> io::Result<u16> {
+            let mut sa: libc::sockaddr_in = unsafe { std::mem::zeroed() };
+            let mut len = std::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t;
+            let rc = unsafe {
+                libc::getsockname(self.fd, &mut sa as *mut libc::sockaddr_in as *mut libc::sockaddr, &mut len)
+            };
+            if rc != 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(u16::from_be(sa.sin_port))
+        }
+
+        /// Connect with a deadline. Consumes the socket (the connection is only needed to
+        /// learn reachability; the capture is what carries the interesting signal).
+        pub fn connect_timeout(self, peer: SocketAddrV4, timeout: Duration) -> bool {
+            let sa = sockaddr_in(peer);
+            let flags = unsafe { libc::fcntl(self.fd, libc::F_GETFL) };
+            unsafe { libc::fcntl(self.fd, libc::F_SETFL, flags | libc::O_NONBLOCK) };
+
+            let rc = unsafe {
+                libc::connect(
+                    self.fd,
+                    &sa as *const libc::sockaddr_in as *const libc::sockaddr,
+                    std::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t,
+                )
+            };
+            if rc == 0 {
+                return true; // connected immediately (loopback / same host)
+            }
+            if io::Error::last_os_error().raw_os_error() != Some(libc::EINPROGRESS) {
+                return false; // refused outright
+            }
+
+            let mut pfd = libc::pollfd { fd: self.fd, events: libc::POLLOUT, revents: 0 };
+            let ms = timeout.as_millis().min(i32::MAX as u128) as libc::c_int;
+            if unsafe { libc::poll(&mut pfd, 1, ms) } <= 0 {
+                return false; // timed out or poll failed: not reachable within the deadline
+            }
+
+            // POLLOUT alone doesn't mean success — a refused connect is also writable.
+            let mut err: libc::c_int = 0;
+            let mut len = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
+            let rc = unsafe {
+                libc::getsockopt(
+                    self.fd,
+                    libc::SOL_SOCKET,
+                    libc::SO_ERROR,
+                    &mut err as *mut libc::c_int as *mut libc::c_void,
+                    &mut len,
+                )
+            };
+            rc == 0 && err == 0
+        }
+    }
+
+    impl Drop for BoundTcpSocket {
+        fn drop(&mut self) {
+            unsafe { libc::close(self.fd) };
+        }
+    }
+}
+
 /// TCP probe that runs an `AF_PACKET` capture during the handshake and reports any RST it
-/// sees, with its TTL judged against `control_ttl`. Linux + `CAP_NET_RAW`; degrades to
-/// [`PlainTcpProbe`] when the capture socket can't be opened, so a non-root run just yields
-/// `rst: None` rather than failing. The end-to-end capture path is validated under the netns
-/// rig (root), not `cargo test`.
+/// sees *on this connection's 5-tuple*, with its TTL judged against `control_ttl`. Linux +
+/// `CAP_NET_RAW`; degrades to [`PlainTcpProbe`] when the socket or capture can't be set up,
+/// so a non-root run just yields `rst: None` rather than failing. The end-to-end capture
+/// path is validated under the netns rig (root), not `cargo test`.
 #[cfg(target_os = "linux")]
 pub struct CapturingTcpProbe;
 
 #[cfg(target_os = "linux")]
 impl TcpProbe for CapturingTcpProbe {
     fn run(&self, tcp_addr: &str, control_ttl: u8) -> TcpProbeResult {
-        let cap = match lok_capture::AfPacketCapture::open() {
-            Ok(c) => c,
-            Err(_) => return PlainTcpProbe.run(tcp_addr, control_ttl), // no CAP_NET_RAW
-        };
-        let Some(sa) = resolve(tcp_addr) else {
+        use lok_capture::{FlowFilter, L4Proto};
+
+        let (Some((peer_ip, peer_port)), Some(SocketAddr::V4(sa))) =
+            (peer_v4(tcp_addr), resolve(tcp_addr))
+        else {
             return TcpProbeResult { reachable: false, rst: None };
         };
+
+        // Bind first: the capture filter needs our port before a single packet moves.
+        let Ok(sock) = boundsock::BoundTcpSocket::new() else {
+            return PlainTcpProbe.run(tcp_addr, control_ttl);
+        };
+        let Ok(local_port) = sock.local_port() else {
+            return PlainTcpProbe.run(tcp_addr, control_ttl);
+        };
+        let cap = match lok_capture::AfPacketCapture::open() {
+            Ok(c) => c,
+            Err(_) => {
+                // No CAP_NET_RAW: still measure reachability on the socket we bound.
+                let reachable = sock.connect_timeout(sa, Duration::from_millis(500));
+                return TcpProbeResult { reachable, rst: None };
+            }
+        };
+
+        let filter = FlowFilter::inbound(peer_ip, peer_port, local_port, L4Proto::Tcp);
         let deadline = Instant::now() + Duration::from_millis(700);
-        let watcher = std::thread::spawn(move || cap.watch_for_rst(control_ttl, deadline).ok().flatten());
+        let watcher =
+            std::thread::spawn(move || cap.watch_for_rst(&filter, control_ttl, deadline).ok().flatten());
         std::thread::sleep(Duration::from_millis(50)); // let the capture start listening
-        let reachable = TcpStream::connect_timeout(&sa, Duration::from_millis(500)).is_ok();
+        let reachable = sock.connect_timeout(sa, Duration::from_millis(500));
         let rst = watcher
             .join()
             .ok()
@@ -265,25 +447,25 @@ pub fn measure_throughput(addr: &str) -> Option<u64> {
 
 /// Measure the clean-path TTL from the real peer, so the RST anomaly test compares against a
 /// value observed on *this* route rather than an assumed constant. Sends one UDP datagram to
-/// the server and captures the echoed reply's TTL. Linux + `CAP_NET_RAW`; falls back to
-/// [`DEFAULT_CONTROL_TTL`] when capture is unavailable or no reply is seen.
+/// the server and captures the echoed reply's TTL, scoped to that datagram's own 5-tuple.
+/// Linux + `CAP_NET_RAW`; falls back to [`DEFAULT_CONTROL_TTL`] when capture is unavailable
+/// or no reply is seen.
 #[cfg(target_os = "linux")]
 fn calibrate_control_ttl(udp_addr: &str) -> u8 {
     fn measure(udp_addr: &str) -> Option<u8> {
+        use lok_capture::{FlowFilter, L4Proto};
+
         let sa = resolve(udp_addr)?;
-        let peer = match sa.ip() {
-            std::net::IpAddr::V4(v4) => v4.octets(),
-            std::net::IpAddr::V6(_) => return None, // IPv6 calibration not modeled yet
-        };
-        let cap = lok_capture::AfPacketCapture::open().ok()?;
+        let (peer_ip, peer_port) = peer_v4(udp_addr)?; // IPv6 calibration not modeled yet
+        // Bind before capturing so the filter can name our port.
         let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
+        let local_port = sock.local_addr().ok()?.port();
         sock.connect(sa).ok()?;
-        let mut buf = [0u8; 8];
-        buf[0..4].copy_from_slice(&0xC0_FF_EE_00u32.to_be_bytes()); // calibration nonce
-        // marker 0 already zero
-        sock.send(&buf).ok()?;
+        let cap = lok_capture::AfPacketCapture::open().ok()?;
+        let filter = FlowFilter::inbound(peer_ip, peer_port, local_port, L4Proto::Udp);
+        sock.send(&datagram_for(CALIBRATION_NONCE, 0)).ok()?;
         let deadline = Instant::now() + Duration::from_millis(400);
-        cap.observe_peer_ttl(peer, deadline).ok().flatten()
+        cap.observe_peer_ttl(&filter, deadline).ok().flatten()
     }
     measure(udp_addr).unwrap_or(DEFAULT_CONTROL_TTL)
 }
@@ -295,8 +477,9 @@ fn calibrate_control_ttl(_udp_addr: &str) -> u8 {
 
 /// The real battery: run the UDP marked-echo delta, then probe the TCP path — filling
 /// `tcp_reachable` (blackout vs UDP-class kill), `rst` (on-wire `injected_rst_at_sni` via the
-/// capture), and `throughput_bps`/`expected_bps` (real `throttle_to_rate`). The RST anomaly
-/// is judged against a control TTL calibrated per route from the real peer (falling back to
+/// capture), `payload_hash_mismatch` (bytes rewritten in flight), and
+/// `throughput_bps`/`expected_bps` (real `throttle_to_rate`). The RST anomaly is judged
+/// against a control TTL calibrated per route from the real peer (falling back to
 /// [`DEFAULT_CONTROL_TTL`]). Uses the default TCP probe: capturing on Linux (root), plain
 /// otherwise.
 pub fn probe_battery(udp_addr: &str, tcp_addr: &str, count: u32) -> std::io::Result<Observation> {

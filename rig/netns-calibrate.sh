@@ -6,9 +6,12 @@
 # can be checked against KNOWN ground truth on real kernel path — the safety net that lets
 # you trust a live delta later (you can't tell a capture bug from a finding on the wire).
 #
-# Status: clean, UDP silent-drop, throttle, and injected-RST cases all run today. The battery
-# measures real TCP reachability + throughput, and (Linux+root) runs an AF_PACKET capture
-# during the handshake so a reset with an anomalous TTL is recovered as injected_rst_at_sni.
+# Status: six cases run today — clean, UDP silent-drop, throttle, injected-RST, in-flight
+# payload mutation, and a negative case proving a foreign RST does NOT contaminate a clean
+# verdict. The battery measures real TCP reachability + throughput, and (Linux+root) runs an
+# AF_PACKET capture during the handshake so a reset with an anomalous TTL is recovered as
+# injected_rst_at_sni. Every capture is scoped to the probe's own 5-tuple, which is what the
+# sixth case exists to prove on the wire rather than only in unit tests.
 #
 # Requires root (CAP_NET_ADMIN) and a kernel with netns + veth. Verified target: WSL2.
 set -euo pipefail
@@ -101,6 +104,57 @@ NFT
     ip netns exec "$NS_B" nft delete table ip lok 2>/dev/null || true
     echo "  probe -> $out"
     echo "$out" | grep -q '"kind":"injected_rst_at_sni"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
+
+    # Payload mutated in flight: nftables rewrites one byte of the echo's known payload on
+    # the server's egress (and fixes the UDP checksum itself, exactly as a real middlebox
+    # must). Every marker still arrives, so only the sent-vs-returned byte comparison can
+    # see it — this is the case that separates payload_mutated from a drop verdict.
+    # @th,128,8 = 8 bits at bit 128 from the UDP header = payload byte 8 = the first byte
+    # after [nonce][marker], i.e. the start of the probe's known payload.
+    echo "--- case: payload mutated in flight (expect payload_mutated) ---"
+    ip netns exec "$NS_B" nft -f - <<NFT
+table ip lokmut {
+    chain out {
+        type filter hook output priority mangle;
+        udp sport $PORT @th,128,8 set 0xff
+    }
+}
+NFT
+    ip netns exec "$NS_B" ./target/debug/echo-server "$IP_B:$PORT" &
+    srv=$!; sleep 0.3
+    out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
+    kill "$srv" 2>/dev/null || true
+    ip netns exec "$NS_B" nft delete table ip lokmut 2>/dev/null || true
+    echo "  probe -> $out"
+    echo "$out" | grep -q '"kind":"payload_mutated"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
+
+    # Negative case — the shared-vantage false positive. A second flow to a closed port on the
+    # same server answers with RSTs whose TTL is mangled to 200, i.e. RSTs that WOULD read as
+    # injected if the capture matched them. They belong to a different 5-tuple, so the probe
+    # must ignore them and still call the (genuinely clean) measured path ok. Before the flow
+    # filter this case reported injected_rst_at_sni on a healthy path.
+    echo "--- case: foreign RST on another flow (expect ok, not injected_rst_at_sni) ---"
+    ip netns exec "$NS_B" nft -f - <<NFT
+table ip lokrst {
+    chain out {
+        type filter hook output priority mangle;
+        tcp sport 9999 tcp flags rst ip ttl set 200
+    }
+}
+NFT
+    ip netns exec "$NS_B" ./target/debug/echo-server "$IP_B:$PORT" &
+    srv=$!
+    # Noise generator: repeatedly hit a closed port so the server keeps emitting mangled RSTs
+    # across the probe's capture window. Paced, so it doesn't skew the throughput measurement.
+    ip netns exec "$NS_A" bash -c "while :; do (exec 3<>/dev/tcp/$IP_B/9999) 2>/dev/null; sleep 0.05; done" &
+    noise=$!
+    sleep 0.3
+    out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
+    kill "$noise" 2>/dev/null || true
+    kill "$srv" 2>/dev/null || true
+    ip netns exec "$NS_B" nft delete table ip lokrst 2>/dev/null || true
+    echo "  probe -> $out"
+    echo "$out" | grep -q '"kind":"ok"' && echo "  PASS" || { echo "  FAIL (a foreign flow's RST leaked into the verdict)"; exit 1; }
 
     echo "calibration: OK"
 }

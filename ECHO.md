@@ -57,7 +57,14 @@ Resolution — **the marker is the transport's own sequence structure, recovered
     anyway: WireGuard sender index, TLS `ClientHello.random`, etc. No added bytes.
   - *Synthetic control probe* — an openly-synthetic stream that IS allowed a header (magic + 16-byte
     nonce + `u16` marker + CRC), because its whole job is to be a clean, fully-labeled baseline. It
-    is never dressed as a real transport, so its fingerprint doesn't matter.
+    is never dressed as a real transport, so its fingerprint doesn't matter. The implemented MVP is
+    this probe: `[u32 nonce][u32 marker][32 bytes of known payload]`, echoed verbatim. The payload
+    is a deterministic function of the marker, so the sensor recomputes what it sent instead of
+    retaining it, and a middlebox replaying one segment's bytes into another's slot still reads as
+    a mismatch. **The payload block is what makes `payload-mutated` observable at all** — with a
+    bare header, a rewrite past byte 8 leaves nothing to compare. A rewrite of the nonce or marker
+    themselves is *not* `payload-mutated`: the datagram stops being recognizable as ours and reads
+    as a drop. Detecting header rewrites needs the keyed-marker scheme, not this MVP.
   - Fallback within a capture window: the 4-tuple, corrected for NAT on the src side.
 
 **No app-layer marker rides inside real-transport payloads.** The synthetic probe carries the
@@ -151,10 +158,11 @@ A netns/loopback rig with two namespaces (sensor, server) and a middlebox point 
 |---|---|---|
 | segment N dropped | `nftables`/`tc` drop matching the Nth segment / byte offset | `silent-drop-from-segment-N` |
 | forged RST after SNI | NFQUEUE helper watches for the SNI, injects a spoofed RST with a **distinct TTL** | `injected-rst-at-sni` |
-| payload rewrite in flight | NFQUEUE program mutating bytes in a matched range | `payload-mutated` |
+| payload rewrite in flight | `nftables` raw-payload set (`@th,128,8`) on the server's egress — the kernel fixes the UDP checksum, as a real middlebox must | `payload-mutated` |
 | rate limit to R | `tc tbf`/`htb` on the middlebox link | `throttle-to-rate-R` |
 | UDP dropped, TCP kept | `nftables` drop udp / accept tcp | `udp-class-drop` |
 | clean path | no injection | `ok` |
+| **foreign RST on another flow** (negative case) | a second flow to a closed port answers with RSTs whose TTL is mangled to 200 | `ok` — *not* `injected-rst-at-sni` |
 
 Calibration passes when the probe + AF_PACKET capture + classifier recover the **injected** verdict
 for every row, with no false positives on the clean path. Only then does the calibrated probe point
@@ -163,6 +171,14 @@ to CONTRACT Part 1 gets an injection recipe here before it's trusted in the fiel
 
 The forged-RST injector deliberately uses a TTL/IP-ID *unlike* the loopback peer, so the
 self-identification logic in §5 is exercised, not bypassed.
+
+**The negative case is not optional.** A raw `AF_PACKET` capture sees every frame on the
+interface, so on any shared vantage — which every real VPS is: SSH, background updates, a second
+probe run — an unfiltered watch will eventually match some *other* flow's RST and judge its TTL
+against a control measured on our route. That reads as `injected-rst-at-sni` on a healthy path:
+a fabricated finding, the worst failure this project can ship. Every capture is therefore scoped
+to the 5-tuple of a socket the probe bound *before* opening the capture, and the rig proves the
+scoping on the wire rather than only in unit tests.
 
 ---
 

@@ -11,8 +11,8 @@ use std::thread;
 use echo_server::{serve, serve_tcp, DropPolicy};
 use lok_contract::{Observation, RstInfo, Transport, Verdict};
 use probe::{
-    classify, measure_throughput, probe_battery, probe_battery_with, probe_once, tcp_reachable,
-    TcpProbe, TcpProbeResult,
+    classify, measure_throughput, payload_for, payload_intact, probe_battery, probe_battery_with,
+    probe_once, tcp_reachable, TcpProbe, TcpProbeResult, PROBE_PAYLOAD_LEN,
 };
 
 /// A TCP probe that pretends the connection was reset by a middlebox with an anomalous TTL —
@@ -175,4 +175,67 @@ fn battery_injected_rst_classifies_on_wire() {
     assert_eq!(obs.rst.map(|r| r.ttl_anomaly), Some(true));
     assert!(!obs.tcp_reachable, "a reset connection is not reachable");
     assert_eq!(classify(&obs), Verdict::InjectedRstAtSni);
+}
+
+// ---------------------------------------------------------------------------
+// payload_mutated — the known-payload channel that makes a rewrite observable
+// ---------------------------------------------------------------------------
+
+/// The payload must differ per marker, or a middlebox that replays one segment's bytes into
+/// another's slot would pass as intact.
+#[test]
+fn known_payload_is_marker_specific() {
+    assert_ne!(payload_for(0), payload_for(1));
+    assert_ne!(payload_for(1), payload_for(2));
+    assert_eq!(payload_for(3), payload_for(3)); // deterministic: recomputable, not stored
+}
+
+#[test]
+fn payload_intact_rejects_rewrites_and_truncation() {
+    let mut echo = vec![0u8; 8];
+    echo.extend_from_slice(&payload_for(2));
+    assert!(payload_intact(&echo, 2));
+    assert!(!payload_intact(&echo, 3), "another marker's payload is not intact");
+
+    let mut flipped = echo.clone();
+    flipped[8] ^= 0xFF;
+    assert!(!payload_intact(&flipped, 2));
+
+    assert!(!payload_intact(&echo[..8 + PROBE_PAYLOAD_LEN - 1], 2), "short echo is not intact");
+
+    let mut padded = echo.clone();
+    padded.push(0);
+    assert!(!payload_intact(&padded, 2), "long echo is not intact");
+}
+
+/// A clean echo must not raise a false `payload_mutated` — the failure mode that would make
+/// the verdict useless live.
+#[test]
+fn clean_echo_reports_no_mutation() {
+    let addr = spawn_echo(DropPolicy::None);
+    let obs = probe_once(&addr, 8).expect("probe run");
+    assert!(!obs.payload_hash_mismatch);
+    assert_eq!(classify(&obs), Verdict::Ok);
+}
+
+/// Real end-to-end: an echo that rewrites one payload byte — markers all arrive, so only the
+/// byte comparison can see it. The rig's nftables case does the same thing mid-path.
+#[test]
+fn rewritten_payload_recovers_payload_mutated() {
+    let sock = UdpSocket::bind("127.0.0.1:0").expect("bind mutating echo");
+    let addr = sock.local_addr().unwrap().to_string();
+    thread::spawn(move || {
+        let mut buf = [0u8; 2048];
+        while let Ok((n, peer)) = sock.recv_from(&mut buf) {
+            if n > 8 {
+                buf[8] ^= 0xFF; // one byte of the known payload, rewritten in flight
+            }
+            let _ = sock.send_to(&buf[..n], peer);
+        }
+    });
+
+    let obs = probe_once(&addr, 8).expect("probe run");
+    assert_eq!(obs.highest_marker_arrived, Some(7), "every marker still arrives");
+    assert!(obs.payload_hash_mismatch);
+    assert_eq!(classify(&obs), Verdict::PayloadMutated);
 }

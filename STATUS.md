@@ -1,7 +1,7 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-08-26 (added ECHO.md protocol spec; sequencing + calibration + gap-read folded in).
+> or an open question closes. Last updated: 2026-08-27 (flow-scoped capture + on-wire payload mutation; rig now 6 cases).
 
 ## What it is
 
@@ -15,15 +15,17 @@ differential technique.
 ## Repo
 
 `github.com/Mezo-oz/Lokhotron` — public, MIT. Design settled; **Phase 1 scaffold + TCP increment
-built and verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **20
-tests pass** (2 lok-contract + 4 lok-capture + 14 calibration incl. real loopback end-to-end).
+built and verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **30
+tests pass** (2 lok-contract + 9 lok-capture + 19 calibration incl. real loopback end-to-end).
 
 Crates: `lok-contract` (Verdict/Observation/Transport/TelemetryReport/WeightedBundle — types +
 `sample`/`verify_stub`), `echo-server` (marked-echo UDP **+ TCP byte-echo**; DropPolicy =
-calibration fault-emulation only), `probe` (`classify` pure fn; UDP `probe_once`; **`tcp_reachable`
-+ `measure_throughput` + `probe_battery`**; `tests/calibration.rs`), `lok-capture`
-(`AfPacketCapture` + `watch_for_rst` + `parse_ipv4_tcp_rst` + `ipv4_from_frame` + `is_ttl_anomalous`),
-`rig/netns-calibrate.sh` (clean + UDP-drop + **throttle** run today; RST stubbed).
+calibration fault-emulation only), `probe` (`classify` pure fn; UDP `probe_once` with a known
+payload block; **`tcp_reachable` + `measure_throughput` + `probe_battery`**; bind-before-connect
+`BoundTcpSocket` so the capture can be flow-scoped; `tests/calibration.rs`), `lok-capture`
+(`AfPacketCapture` + **`FlowFilter`/`rst_from_flow`/`peer_ttl_from_flow`** + `watch_for_rst` +
+`parse_ipv4_tcp_rst` + `ipv4_from_frame` + `is_ttl_anomalous`), `rig/netns-calibrate.sh`
+(**six cases**, all on real kernel-injected faults).
 
 **Closed:** real `tcp_reachable` (a full UDP blackout with TCP up reads `udp_class_drop`; TCP-down
 reads `timeout_indistinct` instead of masking); real bulk throughput → `throttle_to_rate`; and
@@ -41,13 +43,29 @@ unavailable.
 **Verified end-to-end on real packets** (`sudo rig/netns-calibrate.sh`, WSL Ultramarine): clean →
 `ok`; drop-from-4 → `silent_drop_from_segment{n:4}`; `tc tbf` 128 kbit → `throttle_to_rate`
 (measured ~124 kbit); `nft`-mangled RST (TTL 200) → `injected_rst_at_sni` (judged against the
-calibrated ~64). All four PASS.
+calibrated ~64); `nft` raw-payload rewrite mid-path → `payload_mutated`; and the **negative case**
+— a foreign flow's mangled RSTs in the air during a healthy run → still `ok`. All six PASS.
 
-**Caveats / not fully closed:** `watch_for_rst`/`observe_peer_ttl` match any packet from the peer
-in the namespace (no 5-tuple filter) — fine in the isolated rig, needs a filter for shared
-vantages. `payload_mutated` still validated only synthetically (no on-wire injector yet).
-`WeightedBundle::verify_stub` is a placeholder (real ed25519 with the control plane, Phase 2).
-This is all still **lab** ground-truth — the next real milestone is a live RU/non-RU VPS pair.
+**Both new cases were confirmed as real regressions**, not decoration: the pre-change binaries,
+run against the same rig in a detached worktree, reported `ok` for the mutated-payload case (blind
+to it) and `injected_rst_at_sni` for the foreign-RST case — a *fabricated finding on a healthy
+path*, which is the single worst thing this instrument could do live.
+
+**Closed since (2026-08-27):** captures are **flow-scoped**. `FlowFilter` pins peer IP, peer port,
+our port and protocol; the probe binds its TCP socket (`BoundTcpSocket`, bind-before-connect via
+libc — `std` has no such API) and its UDP socket *before* opening the capture, so the filter can
+name a real local port instead of a wildcard. `payload_mutated` is now on the wire: each datagram
+carries `[nonce][marker][32 bytes of known payload]`, the payload is a deterministic function of
+the marker (recomputed, not retained; a replay into another marker's slot is still a mismatch),
+and the rig rewrites a byte mid-path with `nft @th,128,8 set` — the kernel fixes the UDP checksum,
+exactly as a real middlebox must.
+
+**Caveats / not fully closed:** a rewrite of the *nonce or marker* still reads as a drop, not
+`payload_mutated` — the datagram stops being recognizable as ours. Closing that needs the keyed
+marker scheme (ECHO §2), not this MVP. IPv4 only in the capture path (`peer_v4` returns `None` on
+v6 and the battery falls back to the default control TTL). `WeightedBundle::verify_stub` is a
+placeholder (real ed25519 with the control plane, Phase 2). This is all still **lab** ground-truth
+— the next real milestone is a live RU/non-RU VPS pair.
 
 ## Three-tree architecture (a security boundary, not tidiness)
 
@@ -111,6 +129,8 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done + verified on the wire** (rig, root). |
 | Per-route control-TTL calibration | **Done + verified** — RST judged against measured ~64, not assumed. |
 | Run the netns rig under root (RST + throttle end-to-end) | **Passed** — all 4 cases PASS on real kernel-injected faults (WSL Ultramarine, 2026-08-26). |
+| Flow-scoped capture (5-tuple filter) | **Done + verified on the wire** — foreign RSTs no longer contaminate a clean verdict (rig case 6). |
+| On-wire `payload_mutated` | **Done + verified on the wire** — known payload block + `nft` raw-payload rewrite mid-path (rig case 5). |
 | Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
 | Provision + live run | **Operator step** — create hosts, RU legal check, run setup, fill tags. |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
@@ -133,7 +153,8 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 
 ## Next actions
 
-1. ~~Build Phase 1 step 0 (calibration harness)~~ — **done + verified on the wire.**
+1. ~~Build Phase 1 step 0 (calibration harness)~~ — **done + verified on the wire, 6/6 cases.**
+   The two shared-vantage caveats that would have mattered on a rented box are closed.
 2. **Provision the RU/non-RU VPS pair and run the battery live.** The repeatable deploy is built
    (`deploy/` — `server-setup.sh`, `sensor-setup.sh`, systemd units, `DEPLOY.md`). Remaining is
    the part only the operator can do: create two hosts, do the **RU legal/risk check**, pick

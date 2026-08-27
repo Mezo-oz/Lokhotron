@@ -82,7 +82,9 @@ parameter** — a tight, regular cadence of odd probes is itself flaggable. Keep
 
 **Deploys:** the two roles, the periodic battery, local tagged store-and-forward logging, and the
 full verdict pipeline the rig verified (reachability, silent-drop, throttle, injected-RST with
-per-route TTL calibration).
+per-route TTL calibration, and in-flight payload mutation). Every capture the sensor runs is
+scoped to the probe's own 5-tuple, so the box's other traffic — your SSH session included — can't
+leak into a verdict; the rig proves that with a negative case, not just a unit test.
 
 **Does not (Phase 2+, deliberately):** no ingest/collector (logs stay local — ship them yourself
 for now), no signed bundles, no server-side capture (the RU sensor does the capture/classification
