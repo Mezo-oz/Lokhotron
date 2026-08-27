@@ -38,9 +38,9 @@ blindness. That two-sided honesty is what you're buying with the $10 and the ris
    (consumer-like), **Timeweb** (protocol-selective, best-characterised), **Beget** (near-clean
    control). Regenerate with `python phase0/provider_screen.py`.
 
-   **After renting, check the assigned IP's actual ASN** and record that in
-   `lokhotron-sensor.env` — a plan can land in a different ASN than the one the OONI data
-   describes, which would silently mislabel every verdict the sensor produces.
+   **After renting, check the assigned IP's actual ASN** and set `ASN=`/`REGION=` in
+   `/etc/lokhotron/sensor.env` accordingly — a plan can land in a different ASN than the one the
+   OONI data describes, which would silently mislabel every verdict the sensor produces.
 2. **Legal / sanctions check for the RU box — [LEGAL-RU.md](LEGAL-RU.md).** Done as a research
    pass on 2026-08-27; read it before you create anything, and re-read it at rent time because the
    law moves several times a year. The short version: the sensing layer's Russian-law exposure is

@@ -1,7 +1,9 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-08-27 (flow-scoped capture + on-wire payload mutation, rig now 6 cases; Phase 0 gap read run).
+> or an open question closes. Last updated: 2026-08-27 (flow-scoped capture + on-wire payload
+> mutation, rig 6/6; Phase 0 gap read; RU legal/sanctions check; provider shortlist). **Everything
+> that can be done without renting hosts is now done — the next step is provisioning.**
 
 ## What it is
 
@@ -124,16 +126,18 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Phase | State |
 |---|---|
 | Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
-| Phase 1 **step 0** (calibration harness) | **Built + green** — 21 tests pass. |
+| Phase 1 **step 0** (calibration harness) | **Built + green** — 30 tests pass, clippy clean. |
 | Phase 1 TCP increment (real reachability + throughput) | **Done + green.** |
 | Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done + verified on the wire** (rig, root). |
 | Per-route control-TTL calibration | **Done + verified** — RST judged against measured ~64, not assumed. |
-| Run the netns rig under root (RST + throttle end-to-end) | **Passed** — all 4 cases PASS on real kernel-injected faults (WSL Ultramarine, 2026-08-26). |
+| Run the netns rig under root | **Passed 6/6** on real kernel-injected faults (WSL Ultramarine; 4 cases 2026-08-26, payload-mutation + foreign-RST cases 2026-08-27). |
 | Flow-scoped capture (5-tuple filter) | **Done + verified on the wire** — foreign RSTs no longer contaminate a clean verdict (rig case 6). |
 | On-wire `payload_mutated` | **Done + verified on the wire** — known payload block + `nft` raw-payload rewrite mid-path (rig case 5). |
 | Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
-| Provision + live run | **Operator step** — create hosts, RU legal check, run setup, fill tags. |
-| Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | **Done (first read).** `phase0/ooni_gap.py` + [FINDINGS-2026-08-27](phase0/FINDINGS-2026-08-27.md). The gap is real but **provider-specific**, not a constant. |
+| RU legal / sanctions check | **Done** — [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md). Research pass, not advice; re-read at rent time. |
+| Provider screen (OFAC + OONI) | **Done** — [phase0/PROVIDER-SHORTLIST.md](phase0/PROVIDER-SHORTLIST.md). 22 candidates; Aeza designated; 3 suggested spanning path profiles. |
+| Provision + live run | **NEXT — operator step.** Everything upstream is unblocked; see the runbook below. |
+| Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | **Done (first read).** `phase0/ooni_gap.py` + [FINDINGS-2026-08-27](phase0/FINDINGS-2026-08-27.md). The gap is real but **provider-specific**, not a constant — which turned provider choice into a measurement decision. |
 | Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
 | Phase 3 (client-as-sensor fusion — the only clean gap-closer) | Not started. |
@@ -171,24 +175,53 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 
 ## Next actions
 
-1. ~~Build Phase 1 step 0 (calibration harness)~~ — **done + verified on the wire, 6/6 cases.**
-   The two shared-vantage caveats that would have mattered on a rented box are closed.
-2. **Provision the RU/non-RU VPS pair and run the battery live.** The repeatable deploy is built
-   (`deploy/` — `server-setup.sh`, `sensor-setup.sh`, systemd units, `DEPLOY.md`). Remaining is
-   the part only the operator can do: create two hosts, do the **RU legal/risk check**, pick
-   providers, run the two setup scripts, fill in ASN/REGION. This is the week that tests the
-   thesis — watch the `timeout_indistinct` rate; a calibrated blank is now a real finding.
-3. ~~Screen the providers you'd actually rent~~ — **done**
-   ([phase0/PROVIDER-SHORTLIST.md](phase0/PROVIDER-SHORTLIST.md), 22 candidates, 2026-08-27).
-   **Aeza is OFAC-designated: do not transact.** 13 of 22 have no OONI coverage, so most providers
-   cannot be previewed at all; the nine that can split into four path profiles. Suggested three,
-   chosen to span profiles: **MTW** (consumer-like), **Timeweb** (protocol-selective, best
-   sampled), **Beget** (near-clean control). After renting, verify the assigned IP's real ASN
-   before tagging — the ASN with OONI signal may not be the one your plan lands in.
-4. ~~Stand up the OONI-residential vs DC-VPS reachability comparison~~ — **done**; it lives in
-   `phase0/` and folds into the Phase 1 write-up as the directional gap read. Two things it hands
-   forward: **rent 2-3 RU VPSes at different providers** rather than one (the spread makes a single
-   box unrepresentative, and it is still inside the ~$10/mo envelope), and once a sensor is live,
-   feed its results back in via `--dc-measurements` for the apples-to-apples version.
-5. (Phase 2, gated on the delta proving informative) reconcile the transport enum with
-   amnezia-client's real set; decide whether the bundle channel rides amnezia's config-update path.
+**Everything that does not require a rented host is done.** What remains is the provisioning
+runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tests the thesis.
+
+1. **Re-run both screens before spending anything.** Sanctions designations and TSPU filtering
+   each move month to month, and both outputs are dated snapshots:
+   `python phase0/provider_screen.py` and `python phase0/ooni_gap.py`. If a provider's OFAC status
+   or path profile changed, the shortlist changes with it.
+
+2. **Rent.** One non-RU echo server (anywhere outside RU with a stable public IP) and **2-3 RU
+   sensors at different providers** — the spread between RU hosting providers is 87-96 pp, so one
+   box cannot be called representative. Current suggestion, chosen to span path profiles:
+   **MTW** (consumer-like), **Timeweb** (protocol-selective, best characterised), **Beget**
+   (near-clean control). **Aeza is OFAC-designated — do not transact.** Rent in your own name with
+   accurate details; OFAC-screen the provider, its parent and affiliates at purchase, and again at
+   renewal. Full reasoning: [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md).
+
+3. **Provision** ([deploy/DEPLOY.md](deploy/DEPLOY.md)). `server-setup.sh <bind>:47017` on the
+   non-RU box, `sensor-setup.sh <server-ip>:47017 <interval> <count>` on each sensor; open the port
+   in both the host firewall and the provider security group. Then two pre-flight checks that are
+   easy to skip and expensive to get wrong:
+   - **Verify the assigned IP's real ASN** and set `ASN=` / `REGION=` in `/etc/lokhotron/sensor.env`
+     (the setup script writes it from `deploy/lokhotron-sensor.env.example` and warns you). The ASN
+     carrying OONI signal is often not the one a plan lands in (FirstByte: n=2,102 on AS205090,
+     n=1 on its others). A wrong tag mislabels every verdict the sensor ever produces.
+   - **Confirm every probe target is a host we own.** This is the hard rule the legal read rests
+     on — third-party probing is where Art. 274.1 would land — and it is a one-line check of the
+     env file before the timer is enabled.
+
+4. **Run the battery live for a week, and watch the `timeout_indistinct` rate.** The instrument is
+   calibrated 6/6 against kernel-injected faults, so a blank is now a *finding* ("the TSPU is
+   uniform at this granularity") rather than "our tool is blind" — that two-sided honesty is what
+   the calibration bought. Compare the three sensors against each other: divergence between
+   providers is itself the Correction 3 result, measured on our own instrument instead of inferred
+   from OONI.
+
+5. **Fold the results back.** Feed the live numbers into `phase0/ooni_gap.py --dc-measurements` for
+   the apples-to-apples consumer-vs-our-DC comparison DESIGN.md actually asks for, and write up
+   Phase 1 with the claim scoped to *this provider's* DC path plus the OONI comparison as the
+   directional gap read. Publishable on its own (net4people).
+
+6. **(Phase 2, gated on the delta proving informative.)** Reconcile the transport enum with
+   amnezia-client's real set; decide whether the bundle channel rides amnezia's config-update path;
+   replace `WeightedBundle::verify_stub` with real ed25519.
+
+### Recently closed
+
+- Phase 1 step 0 calibration harness — built, and verified on the wire 6/6.
+- Flow-scoped capture and on-wire `payload_mutated` — the two shared-vantage caveats that would
+  have produced fabricated findings on a rented box.
+- Phase 0 gap read, RU legal/sanctions check, and the provider screen — see the phase table.
