@@ -25,13 +25,22 @@ trees."
   without a fingerprint, verdict derivation, and the Phase 1 step-0 fault-injection calibration
   harness (the ground-truth net that replaces "do dpi-bench first").
 - **[STATUS.md](STATUS.md)** — living sitrep: phase status, locked decisions, next actions.
+- **[phase0/](phase0/)** — the DC-vs-consumer gap read: does a datacenter vantage tell you anything
+  about the consumer path? Recruitment-free, built on OONI's existing RU coverage.
 
 ## Status
 
-Design only. First build target is **Phase 1**: one non-RU reverse-measurement server + a couple
-of RU VPS sensors + a probe battery, producing a segment-granularity delta ("what the TSPU did
-to an AmneziaWG handshake in operator X today"). That artifact is publishable on its own; every
-downstream phase is justified by what Phase 1 actually finds.
+**Phase 1 step 0 is built and verified on real packets** — the probe battery, the AF_PACKET
+capture and the verdict classifier are calibrated against kernel-injected faults in a netns rig
+(6/6 cases, including a negative case proving another flow's RST cannot contaminate a verdict).
+The provisioning scripts exist; no hosts are rented yet. **Phase 0's gap read is done**
+([phase0/](phase0/)) and it changed the provisioning plan: block rates spread 87-96 pp *between RU
+hosting providers*, so which provider you rent decides what you can measure.
+
+Next is Phase 1 proper: one non-RU reverse-measurement server + a couple of RU VPS sensors running
+the battery live, producing a segment-granularity delta ("what the TSPU did to an AmneziaWG
+handshake in operator X today"). That artifact is publishable on its own; every downstream phase is
+justified by what Phase 1 actually finds. See [STATUS.md](STATUS.md) for the live picture.
 
 ## Related trees
 

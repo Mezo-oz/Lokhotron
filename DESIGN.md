@@ -300,8 +300,10 @@ Full rationale and the Android duress/PanicKit design in `X:\Lokhotron-client\DI
 ## To verify before this hardens (don't trust from memory)
 
 - TSPU's current treatment of datacenter vs consumer ASNs — the whole DC/consumer correction
-  rests on this; the DC-VPS probe + OONI-residential-reachability diff (Phase 0/1) is the first
-  read on it, but confirm rather than assume.
+  rests on this. **First read done** (2026-08-27, `phase0/FINDINGS-2026-08-27.md`): the gap is real
+  but **provider-specific** (87-96 pp spread *within* RU hosting ASNs on every test) and its sign
+  flips by test. Correction 3 holds, in a sharper form — a VPS may be measuring an unrelated path,
+  not a lenient one. Still to confirm with our own sensor rather than OONI's hosting-ASN proxy.
 - Current Russian legal exposure for running a sensor / recruiting a volunteer (active, changing
   legislation).
 - OONI and Censored Planet current API shapes before writing Phase 0 ingest — specifically which

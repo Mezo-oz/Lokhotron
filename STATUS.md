@@ -1,7 +1,7 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-08-27 (flow-scoped capture + on-wire payload mutation; rig now 6 cases).
+> or an open question closes. Last updated: 2026-08-27 (flow-scoped capture + on-wire payload mutation, rig now 6 cases; Phase 0 gap read run).
 
 ## What it is
 
@@ -133,18 +133,26 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | On-wire `payload_mutated` | **Done + verified on the wire** — known payload block + `nft` raw-payload rewrite mid-path (rig case 5). |
 | Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
 | Provision + live run | **Operator step** — create hosts, RU legal check, run setup, fill tags. |
-| Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | Not started. |
+| Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | **Done (first read).** `phase0/ooni_gap.py` + [FINDINGS-2026-08-27](phase0/FINDINGS-2026-08-27.md). The gap is real but **provider-specific**, not a constant. |
 | Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
 | Phase 3 (client-as-sensor fusion — the only clean gap-closer) | Not started. |
 
 ## Open before hardening (verify, don't trust from memory)
 
-- TSPU's current DC-vs-consumer treatment — the OONI-residential vs DC-VPS diff is the first read;
-  Correction 3 rests on it.
+- ~~TSPU's current DC-vs-consumer treatment~~ — **first read done** (2026-08-27,
+  [phase0/FINDINGS-2026-08-27.md](phase0/FINDINGS-2026-08-27.md)). Correction 3 stands and is
+  sharper than stated: within RU hosting ASNs the block rate spreads **87-96 pp on every test**
+  (Beget near-clean across Tor/Psiphon/Telegram while consumer operators sit at 75-99%), and the
+  gap's *sign* flips by test (Psiphon +65 pp consumer-vs-DC, Telegram -7.9 pp). So the risk isn't
+  that a VPS is a lenient sensor — it may be an unrelated one. **Consequence: which RU provider you
+  rent decides what you can measure.** Re-run the read before provisioning; the picture is
+  month-specific.
 - Current Russian legal exposure for running a sensor / recruiting volunteers.
-- OONI + Censored Planet current API shapes, and which residential RU reachability tests are
-  populated for the operators of interest.
+- ~~OONI current API shapes / which RU reachability tests are populated~~ — **answered**
+  (`api.ooni.io/api/v1/aggregation`, `axis_x=probe_asn`, live and well-populated: psiphon 79k,
+  telegram 45k, tor 45k, torsf 1.2k, riseupvpn 322 over 30 days; `vanilla_tor` unusable, ~95%
+  failures). Censored Planet shapes still unverified — not needed for the gap read.
 - Concrete transport enum must track amnezia-client's real transport set, not the draft guess.
 - **Verdict vocabulary ↔ dpi-bench property vocabulary** — reconcile once dpi-bench firms up
   (one-way pull into CONTRACT Part 1; not a blocker; dpi-bench is a separate session).
@@ -160,7 +168,10 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
    the part only the operator can do: create two hosts, do the **RU legal/risk check**, pick
    providers, run the two setup scripts, fill in ASN/REGION. This is the week that tests the
    thesis — watch the `timeout_indistinct` rate; a calibrated blank is now a real finding.
-3. Stand up the OONI-residential vs DC-VPS reachability comparison and fold it into the Phase 1
-   write-up as the directional DC-vs-consumer gap read.
+3. ~~Stand up the OONI-residential vs DC-VPS reachability comparison~~ — **done**; it lives in
+   `phase0/` and folds into the Phase 1 write-up as the directional gap read. Two things it hands
+   forward: **rent 2-3 RU VPSes at different providers** rather than one (the spread makes a single
+   box unrepresentative, and it is still inside the ~$10/mo envelope), and once a sensor is live,
+   feed its results back in via `--dc-measurements` for the apples-to-apples version.
 4. (Phase 2, gated on the delta proving informative) reconcile the transport enum with
    amnezia-client's real set; decide whether the bundle channel rides amnezia's config-update path.

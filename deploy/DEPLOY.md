@@ -20,6 +20,15 @@ blindness. That two-sided honesty is what you're buying with the $10 and the ris
    (ex-RU/EU/US VPS is fine). RU sensor: a Russian-operator VPS. Note the DC-vs-consumer caveat
    (DESIGN Correction 3) — a DC VPS characterizes the **datacenter** path, not consumer; scope the
    claim accordingly and lean on the OONI-residential comparison for the gap read.
+
+   **Which RU provider you pick decides what you can measure — treat it as a measurement decision,
+   not a procurement one.** The Phase 0 read (`phase0/FINDINGS-2026-08-27.md`) found block rates
+   spreading **87-96 pp between RU hosting providers on the same test in the same month**: one
+   provider sat near-clean across Tor/Psiphon/Telegram while consumer operators were 75-99% blocked.
+   Renting on price alone is choosing your findings at random. So: **rent 2-3 RU VPSes at different
+   providers** rather than one — still inside the ~$10/mo envelope, and a single box cannot be
+   called representative. Re-run `python phase0/ooni_gap.py` first; the picture is month-specific
+   and a provider that looks clean today may be filtered by the time you rent.
 2. **Legal / risk check for the RU box.** Verify current Russian legal exposure for running a
    measurement sensor before you create it — this is in the "verify before hardening" list and it
    changes. A VPS under your own name is lower human-risk than a volunteer's device, but it is

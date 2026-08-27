@@ -1,0 +1,70 @@
+{
+  "_doc": [
+    "ASN -> {consumer_isp | hosting_dc | unclassified}, used by ooni_gap.py.",
+    "",
+    "Rules are keyword matches (word-boundary, case-insensitive) against the RIPE holder",
+    "name resolved at runtime, so buckets can be audited against a name rather than a bare",
+    "AS number. Rules are evaluated in order; hosting first, so a hosting provider whose",
+    "name contains an operator-ish token cannot land on the consumer side.",
+    "",
+    "METHOD RULE, and it matters: an ASN is classified on IDENTITY EVIDENCE ONLY -- its",
+    "holder name, its website, what the company sells. Never on its measured block rate.",
+    "Deciding buckets after looking at rates is how you manufacture a gap. Anything whose",
+    "identity is genuinely unclear stays unclassified and is reported with its own pooled",
+    "rate, so a reader can see whether the classification choice moved the headline.",
+    "",
+    "consumer_isp is scoped to operators that sell service to end users in Russia. These",
+    "are the networks TSPU is installed at, which is the population Correction 3 is about.",
+    "hosting_dc is scoped to hosting/VPS/cloud providers -- the vantage a cheap RU VPS",
+    "actually buys you."
+  ],
+  "rules": [
+    {
+      "class": "hosting_dc",
+      "why": "Generic hosting tokens plus RU hosting/VPS/cloud brands. 'server', 'hosting', 'vds' and 'vps' are business descriptions, not incidental words.",
+      "match": [
+        "hosting", "vds", "vps", "colocation", "colo", "datacenter",
+        "selectel", "timeweb", "aeza", "ruvds", "firstvds", "beget", "ihor",
+        "sprinthost", "fornex", "netangels", "majordomo", "rusonyx", "masterhost",
+        "agava", "infobox", "filanco", "dataline", "atomdata", "cloud4y", "itglobal",
+        "zomro", "serverel", "hetzner", "ovh", "digitalocean", "mtw", "cloud.ru"
+      ]
+    },
+    {
+      "class": "consumer_isp",
+      "why": "Russian operators selling access to end users. Federal operators and their regional subsidiaries (which keep the parent's name in the RIPE holder field), plus large regional ISPs.",
+      "match": [
+        "rostelecom", "vimpelcom", "beeline", "mts", "megafon", "t2 mobile", "tele2",
+        "er-telecom", "ufanet", "intersvyaz", "novotelecom", "iskratelecom",
+        "transtelecom", "ttk-svyaz", "moscow city telephone network", "mgts",
+        "severen-telecom", "orion telecom", "skynet", "yarnet", "axioma"
+      ]
+    }
+  ],
+  "overrides": {
+    "_doc": [
+      "Per-ASN decisions where the name alone is not enough. Each carries the evidence used.",
+      "Rate was not consulted for any of these."
+    ],
+    "205090": "hosting_dc",
+    "9123": "hosting_dc",
+    "198610": "hosting_dc",
+    "208677": "hosting_dc",
+    "209641": "hosting_dc",
+    "48347": "hosting_dc"
+  },
+  "override_evidence": {
+    "205090": "FIRST-SERVER-EUROPE / FIRST SERVER LIMITED - server-hosting business per AS name; not in PeeringDB. Largest hosting-side contributor, so the finding reports the headline with and without it.",
+    "9123": "TimeWeb-AS / JSC TIMEWEB - timeweb.ru, major RU shared-hosting and VPS provider (PeeringDB website field).",
+    "198610": "BEGET-AS / Beget LLC - beget.com, major RU hosting provider (PeeringDB website field).",
+    "208677": "CLOUDRU-AS / 'Cloud Technologies' LLC trading as Cloud.ru - RU public cloud.",
+    "209641": "I-SERVERS-EAST / IHOR HOSTING LTD - hosting per holder name. Its PeeringDB record ('Educational/Research', unrelated contact name) is stale and was not used.",
+    "48347": "MTW-AS / JSC Mediasoft ekspert - mtw.ru hosting provider; RIPE remarks carry lg.mtw.ru, PeeringDB website https://mtw.ru."
+  },
+  "deliberately_unclassified": {
+    "_doc": "Ambiguous identities, left out of BOTH buckets. Listed so the choice is visible rather than silent.",
+    "8242": "INTELWAY-AS / Digital Solutions LLC - matched a generic 'digital' token in an early draft; nothing establishes hosting vs ISP. Not in PeeringDB.",
+    "50716": "TELECOMRUNET / Telecom.ru Ltd - carries upstream/customer remarks like a carrier, but the business is unclear. Third-largest ASN by volume, so it is called out explicitly.",
+    "35598": "INETCOM CARRIER LLC - inetcom.ru; regional ISP or transit carrier, not resolved."
+  }
+}
