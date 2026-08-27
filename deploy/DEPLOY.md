@@ -29,6 +29,18 @@ blindness. That two-sided honesty is what you're buying with the $10 and the ris
    providers** rather than one — still inside the ~$10/mo envelope, and a single box cannot be
    called representative. Re-run `python phase0/ooni_gap.py` first; the picture is month-specific
    and a provider that looks clean today may be filtered by the time you rent.
+
+   **A screened shortlist already exists: [../phase0/PROVIDER-SHORTLIST.md](../phase0/PROVIDER-SHORTLIST.md)**
+   (22 candidates, OFAC-screened and checked against OONI coverage on 2026-08-27). Headlines:
+   **Aeza is OFAC-designated — do not transact**; 13 of the 22 have no OONI coverage at all, so
+   most providers cannot be previewed; and the nine that can fall into four distinct path profiles.
+   The suggested three, chosen to *span* those profiles rather than duplicate one: **MTW**
+   (consumer-like), **Timeweb** (protocol-selective, best-characterised), **Beget** (near-clean
+   control). Regenerate with `python phase0/provider_screen.py`.
+
+   **After renting, check the assigned IP's actual ASN** and record that in
+   `lokhotron-sensor.env` — a plan can land in a different ASN than the one the OONI data
+   describes, which would silently mislabel every verdict the sensor produces.
 2. **Legal / sanctions check for the RU box — [LEGAL-RU.md](LEGAL-RU.md).** Done as a research
    pass on 2026-08-27; read it before you create anything, and re-read it at rent time because the
    law moves several times a year. The short version: the sensing layer's Russian-law exposure is

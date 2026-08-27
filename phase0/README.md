@@ -10,9 +10,15 @@ conclude. Anything beyond that job is a dashboard, and a dashboard is procrastin
 but **provider-specific** (87–96 pp spread *within* the hosting bucket) and its sign flips by test.
 Provider choice for the RU sensor is therefore a measurement decision, not a procurement one.
 
+**Provider screen: [PROVIDER-SHORTLIST.md](PROVIDER-SHORTLIST.md)** applies that finding to the
+providers you might actually rent — an OFAC sanctions screen (live SDN + alias + consolidated
+lists) crossed with each provider's OONI coverage. `provider_screen.py` generates the data;
+the shortlist is the human conclusion.
+
 ## Running it
 
 ```sh
+python phase0/provider_screen.py                # OFAC + OONI screen of the rental candidates
 python phase0/ooni_gap.py                       # last 30 days, RU, default test set
 python phase0/ooni_gap.py --since 2026-07-28 --until 2026-08-27 \
     --out-md phase0/gap-2026-08-27.md --out-json phase0/gap-2026-08-27.json

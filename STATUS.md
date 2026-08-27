@@ -178,10 +178,17 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
    the part only the operator can do: create two hosts, do the **RU legal/risk check**, pick
    providers, run the two setup scripts, fill in ASN/REGION. This is the week that tests the
    thesis — watch the `timeout_indistinct` rate; a calibrated blank is now a real finding.
-3. ~~Stand up the OONI-residential vs DC-VPS reachability comparison~~ — **done**; it lives in
+3. ~~Screen the providers you'd actually rent~~ — **done**
+   ([phase0/PROVIDER-SHORTLIST.md](phase0/PROVIDER-SHORTLIST.md), 22 candidates, 2026-08-27).
+   **Aeza is OFAC-designated: do not transact.** 13 of 22 have no OONI coverage, so most providers
+   cannot be previewed at all; the nine that can split into four path profiles. Suggested three,
+   chosen to span profiles: **MTW** (consumer-like), **Timeweb** (protocol-selective, best
+   sampled), **Beget** (near-clean control). After renting, verify the assigned IP's real ASN
+   before tagging — the ASN with OONI signal may not be the one your plan lands in.
+4. ~~Stand up the OONI-residential vs DC-VPS reachability comparison~~ — **done**; it lives in
    `phase0/` and folds into the Phase 1 write-up as the directional gap read. Two things it hands
    forward: **rent 2-3 RU VPSes at different providers** rather than one (the spread makes a single
    box unrepresentative, and it is still inside the ~$10/mo envelope), and once a sensor is live,
    feed its results back in via `--dc-measurements` for the apples-to-apples version.
-4. (Phase 2, gated on the delta proving informative) reconcile the transport enum with
+5. (Phase 2, gated on the delta proving informative) reconcile the transport enum with
    amnezia-client's real set; decide whether the bundle channel rides amnezia's config-update path.
