@@ -6,12 +6,18 @@
 # can be checked against KNOWN ground truth on real kernel path — the safety net that lets
 # you trust a live delta later (you can't tell a capture bug from a finding on the wire).
 #
-# Status: six cases run today — clean, UDP silent-drop, throttle, injected-RST, in-flight
-# payload mutation, and a negative case proving a foreign RST does NOT contaminate a clean
-# verdict. The battery measures real TCP reachability + throughput, and (Linux+root) runs an
-# AF_PACKET capture during the handshake so a reset with an anomalous TTL is recovered as
-# injected_rst_at_sni. Every capture is scoped to the probe's own 5-tuple, which is what the
-# sixth case exists to prove on the wire rather than only in unit tests.
+# Status: eight cases run today — clean, UDP silent-drop, throttle, injected-RST, in-flight
+# payload mutation, a negative case proving a foreign RST does NOT contaminate a clean
+# verdict, an in-flight rewrite of the probe's own header, and a reflector that bounces the
+# probe back instead of delivering it. The battery measures real TCP reachability +
+# throughput, and (Linux+root) runs an AF_PACKET capture during the handshake so a reset
+# with an anomalous TTL is recovered as injected_rst_at_sni. Every capture is scoped to the
+# probe's own 5-tuple, which is what the sixth case exists to prove on the wire rather than
+# only in unit tests.
+#
+# The last two cases are the keyed wire format's (lok-wire): both are shapes that produced a
+# WRONG verdict before it — a header rewrite read as a drop that never happened, and a
+# reflector read as a healthy path.
 #
 # Requires root (CAP_NET_ADMIN) and a kernel with netns + veth. Verified target: WSL2.
 set -euo pipefail
@@ -23,6 +29,12 @@ VETH_B=lokveth1
 IP_A=10.77.0.1
 IP_B=10.77.0.2
 PORT=47017
+
+# Shared secret for the keyed datagram format, inherited by every `ip netns exec` below.
+# A fixed value on purpose: this is a lab rig, so runs should be byte-reproducible, and a
+# published key is exactly right for a namespace no adversary is on. Real deployments
+# generate their own — see deploy/DEPLOY.md.
+export LOK_PROBE_KEY=7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c
 
 need_root() { [ "$(id -u)" -eq 0 ] || { echo "run as root (CAP_NET_ADMIN needed)"; exit 1; }; }
 
@@ -109,14 +121,15 @@ NFT
     # the server's egress (and fixes the UDP checksum itself, exactly as a real middlebox
     # must). Every marker still arrives, so only the sent-vs-returned byte comparison can
     # see it — this is the case that separates payload_mutated from a drop verdict.
-    # @th,128,8 = 8 bits at bit 128 from the UDP header = payload byte 8 = the first byte
-    # after [nonce][marker], i.e. the start of the probe's known payload.
+    # @th,320,8 = 8 bits at bit 320 from the UDP header = UDP payload byte 32 (the header is
+    # 8 bytes = 64 bits), i.e. the first byte of the keyed payload block, which starts after
+    # [nonce][marker][session][session_tag][leg_tag].
     echo "--- case: payload mutated in flight (expect payload_mutated) ---"
     ip netns exec "$NS_B" nft -f - <<NFT
 table ip lokmut {
     chain out {
         type filter hook output priority mangle;
-        udp sport $PORT @th,128,8 set 0xff
+        udp sport $PORT @th,320,8 set 0xff
     }
 }
 NFT
@@ -155,6 +168,49 @@ NFT
     ip netns exec "$NS_B" nft delete table ip lokrst 2>/dev/null || true
     echo "  probe -> $out"
     echo "$out" | grep -q '"kind":"ok"' && echo "  PASS" || { echo "  FAIL (a foreign flow's RST leaked into the verdict)"; exit 1; }
+
+    # The probe's OWN header rewritten in flight. @th,96,8 = UDP payload byte 4 = the high
+    # byte of the marker. Before the keyed format this made the echo unrecognizable and the
+    # run reported silent_drop_from_segment{n:0} — a fabricated block on a path that
+    # delivered all eight datagrams. The keyed payload still names each one, so the rewrite
+    # now reads as what it is.
+    echo "--- case: probe header rewritten in flight (expect payload_mutated, NOT a drop) ---"
+    ip netns exec "$NS_B" nft -f - <<NFT
+table ip lokhdr {
+    chain out {
+        type filter hook output priority mangle;
+        udp sport $PORT @th,96,8 set 0xff
+    }
+}
+NFT
+    ip netns exec "$NS_B" ./target/debug/echo-server "$IP_B:$PORT" &
+    srv=$!; sleep 0.3
+    out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
+    kill "$srv" 2>/dev/null || true
+    ip netns exec "$NS_B" nft delete table ip lokhdr 2>/dev/null || true
+    echo "  probe -> $out"
+    if echo "$out" | grep -q '"kind":"payload_mutated"'; then
+        echo "  PASS"
+    else
+        echo "  FAIL (a rewritten header must not be reported as a drop)"; exit 1
+    fi
+
+    # A middlebox that swallows the traffic and bounces the probe's own datagrams back,
+    # trying to make a dead path look healthy. `reflect` returns the request byte for byte,
+    # with no response tag — which is all an on-path device without the key can do. The
+    # probe must refuse to score any of it as an arrival. Before the keyed format this read
+    # as ok: every marker "arrived", so the verdict was a clean path.
+    echo "--- case: reflector fakes delivery (expect udp_class_drop, NOT ok) ---"
+    ip netns exec "$NS_B" ./target/debug/echo-server "$IP_B:$PORT" reflect &
+    srv=$!; sleep 0.3
+    out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
+    kill "$srv" 2>/dev/null || true
+    echo "  probe -> $out"
+    if echo "$out" | grep -q '"kind":"udp_class_drop"'; then
+        echo "  PASS"
+    else
+        echo "  FAIL (a reflected request was scored as delivery)"; exit 1
+    fi
 
     echo "calibration: OK"
 }

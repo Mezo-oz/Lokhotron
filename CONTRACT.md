@@ -33,6 +33,15 @@ pointed at the live adversary.
 | `udp-class-drop` | UDP transport dies, TCP/443 survives same path | client-side | control transport comparison |
 | `active-probe-observed` | a Reality probe was forwarded to the real cover site | **server-side only** | server log, no client signal |
 | `payload-mutated` | bytes rewritten in flight | needs delta | server-received ≠ sensor-sent |
+
+> **`payload-mutated` covers a rewrite of the probe's own header too.** On the wire that *is* a
+> rewrite of UDP payload bytes like any other, and a client can act on "this path mangles bytes"
+> but not on where inside our datagram it happened. Which part was rewritten, on which leg, and
+> whether anything tried to fake delivery are **measurement-integrity** facts (`EchoIntegrity` in
+> `lok-contract`, derivation in [ECHO.md](ECHO.md) §2a) — they say how much to trust a verdict,
+> not what the transport suffered, so they are deliberately not verdicts. "Someone reflected our
+> probe" describes the instrument's own channel, and the synthetic control probe's channel has no
+> counterpart in a real transport.
 | `timeout-indistinct` | died with no distinguishing shape | either | the null verdict — see note |
 
 **`timeout-indistinct` is the honest failure mode.** If most blocks land here, the delta isn't

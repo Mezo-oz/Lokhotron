@@ -54,6 +54,13 @@ blindness. That two-sided honesty is what you're buying with the $10 and the ris
    call to accept. Don't skip this step, and don't rent under false details.
 3. **A port.** One UDP+TCP port for the echo server (default `47017`). Open it in the host
    firewall **and** the provider security group.
+4. **How you carry the shared secret to each sensor.** The server and every sensor hold the same
+   64-hex `LOK_PROBE_KEY`; `server-setup.sh` generates one if you don't supply it. It is what makes
+   an arrival provable — without it an on-path device can reflect the probe's own datagrams and the
+   run reads `ok` on a path that delivered nothing (ECHO §2a) — and it is what keeps the echo
+   server from being an **open UDP reflector on a public IP**, which is an abuse report and a
+   provider null-route away from looking exactly like a censorship finding. Carry it over your
+   existing admin channel; it never needs to travel the measured path.
 
 The scripts don't decide any of these — you pass them in.
 
@@ -69,7 +76,10 @@ sudo deploy/server-setup.sh 0.0.0.0:47017
 ```
 
 Installs cargo if needed, builds `echo-server` (release), installs it as `lokhotron-echo`, runs it
-under systemd (`DynamicUser`, hardened), and best-effort opens the port. Verify:
+under systemd (`DynamicUser`, hardened), and best-effort opens the port. It also **generates the
+shared secret** into `/etc/lokhotron/echo.env` (0600) and prints it once — that value goes to every
+sensor. Supply your own instead with `sudo LOK_PROBE_KEY=<64 hex> deploy/server-setup.sh ...`;
+re-running keeps the installed key rather than rotating it out from under live sensors. Verify:
 
 ```sh
 systemctl status lokhotron-echo
@@ -82,10 +92,17 @@ On a clone of this repo on the box:
 
 ```sh
 git clone https://github.com/Mezo-oz/Lokhotron && cd Lokhotron
-sudo deploy/sensor-setup.sh <non-ru-server-ip>:47017 600 8
-#                            \_______server_______/  \__/ \_/
-#                                                  interval count(datagrams)
+sudo LOK_PROBE_KEY=<the server's 64-hex key> \
+    deploy/sensor-setup.sh <non-ru-server-ip>:47017 600 8
+#                           \_______server_______/  \__/ \_/
+#                                                 interval count(datagrams)
 ```
+
+The script ends with a **pre-flight battery run and will not enable the timer unless it comes back
+`ok`.** That gate exists because a mismatched key, a closed provider security group, and a genuine
+total block are indistinguishable in the data — all three produce nothing coming back. Sorting them
+out here costs a minute; sorting them out later means discovering that a week of rows reading
+"blocked" was a typo. If the block *is* the finding, re-run with `LOK_FORCE_ENABLE=1`.
 
 Then **fill in the box's tags** (meaningless data until you do):
 
@@ -110,9 +127,11 @@ parameter** — a tight, regular cadence of odd probes is itself flaggable. Keep
 
 **Deploys:** the two roles, the periodic battery, local tagged store-and-forward logging, and the
 full verdict pipeline the rig verified (reachability, silent-drop, throttle, injected-RST with
-per-route TTL calibration, and in-flight payload mutation). Every capture the sensor runs is
-scoped to the probe's own 5-tuple, so the box's other traffic — your SSH session included — can't
-leak into a verdict; the rig proves that with a negative case, not just a unit test.
+per-route TTL calibration, in-flight payload mutation, and in-flight rewrites of the probe's own
+header). Every capture the sensor runs is scoped to the probe's own 5-tuple, so the box's other
+traffic — your SSH session included — can't leak into a verdict; the rig proves that with a
+negative case, not just a unit test. Arrivals are keyed, so a device that swallows the traffic and
+reflects the probe back cannot make the path read healthy; that too has a rig case.
 
 **Does not (Phase 2+, deliberately):** no ingest/collector (logs stay local — ship them yourself
 for now), no signed bundles, no server-side capture (the RU sensor does the capture/classification
@@ -128,5 +147,9 @@ Phase 2 (CONTRACT open questions).
   sensor's server as a client endpoint.
 - **Dark endpoints stay out of this.** If/when you add canary endpoints (DESIGN), they are
   provisioned separately and never appear in any client bundle. Don't fold them in here.
+- **Key hygiene.** `/etc/lokhotron/echo.env` and `/etc/lokhotron/sensor.env` are 0600 and hold the
+  shared secret; `sensor.env` is sourced with `set -a` so the probe actually sees it. To rotate,
+  change both ends together — a sensor left on the old key goes silent, and silence is the one
+  signal this system cannot tell apart from censorship.
 - **Teardown.** `sudo systemctl disable --now lokhotron-echo` /
   `lokhotron-sensor.timer`, then remove the unit files and `/usr/local/bin/lokhotron-*`.

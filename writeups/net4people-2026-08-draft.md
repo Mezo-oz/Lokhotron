@@ -15,9 +15,10 @@
 
 **TL;DR.** I built a measurement pipeline for characterising what Russia's TSPU does to a
 connection — not pass/fail, but *what shape* the failure has — and calibrated it against
-kernel-injected faults with known ground truth before pointing it at anything real. Six fault
-classes, six correct verdicts, including two negative cases that exist to catch the pipeline
-inventing findings. Separately, a recruitment-free read on public OONI data says the
+kernel-injected faults with known ground truth before pointing it at anything real. Eight fault
+classes, eight correct verdicts, and three of them exist only to catch the pipeline inventing
+findings — including one where a middlebox that swallows every packet could previously make the
+tool report a clean path. Separately, a recruitment-free read on public OONI data says the
 datacenter-vs-consumer gap in Russia is **provider-specific, not a constant**, which changes how a
 VPS-based vantage can be interpreted at all. The live run is next. **I'm posting the method before
 the run specifically to get it torn apart while that's still cheap.**
@@ -55,10 +56,12 @@ the *injected* verdict.
 | drop from segment 4 | server-side drop of markers ≥ 4 | `silent_drop_from_segment{n:4}` | pass |
 | rate limit to 128 kbit | `tc tbf` on the server's egress | `throttle_to_rate` | pass (measured ~124 kbit) |
 | forged RST | `nft` mangles the RST's TTL to 200 | `injected_rst_at_sni` | pass (judged against a *measured* control TTL of ~64) |
-| payload rewritten in flight | `nft @th,128,8 set` — kernel fixes the UDP checksum, as a real middlebox must | `payload_mutated` | pass |
+| payload rewritten in flight | `nft @th,320,8 set` — kernel fixes the UDP checksum, as a real middlebox must | `payload_mutated` | pass |
 | **foreign RST on another flow** | a second flow to a closed port emits RSTs with TTL mangled to 200 | **`ok` — must NOT fire** | pass |
+| the probe's **own header** rewritten in flight | `nft @th,96,8 set` — the marker's high byte | `payload_mutated` — must NOT read as a drop | pass |
+| **a reflector answers instead of the server** | the request bounced back byte for byte, unsigned | the drop verdict — **must NOT be `ok`** | pass |
 
-The last row is the one I'd argue matters most. A raw `AF_PACKET` capture sees every frame on the
+The negative rows are the ones I'd argue matter most. A raw `AF_PACKET` capture sees every frame on the
 interface, so on any shared vantage — which every rented VPS is: SSH, background traffic, a second
 probe run — an unfiltered watch will eventually match some *other* flow's RST and judge its TTL
 against a control measured on your route. That reads as `injected_rst_at_sni` on a healthy path: a
@@ -70,9 +73,44 @@ were silently blind to the payload rewrite. The fix is to scope every capture to
 5-tuple, which requires knowing your own ephemeral port *before* the capture opens — so the TCP
 socket is bound before connect (no `std` API for that; it's a small `libc` shim).
 
-Two limits I'd rather state than have found: a rewrite of the datagram's *nonce or marker* reads as
-a drop, not a mutation, because the datagram stops being recognisable as ours — detecting header
-rewrites needs a keyed-marker scheme. And the capture path is IPv4-only today.
+The last two rows come from a second pass over the same question: *what else can this instrument be
+made to say that isn't true?* Two things, both fixed by keying the echo protocol with a secret
+shared between sensor and echo server.
+
+The first was mine to have caught earlier. The probe's datagrams carried
+`[nonce][marker][known payload]` with the payload a **public** function of the marker. Rewrite the
+marker mid-path and the echo stops being recognisable, so the run reports a drop — I measured the
+pre-fix binaries reporting `udp_class_drop`, i.e. *"UDP is dead on this path"*, against a path that
+delivered all eight datagrams with one byte changed. The fix: derive the 32-byte payload as
+`HMAC(K, nonce ‖ marker ‖ session)`, so it identifies the datagram *on its own*. A destroyed header
+no longer destroys the evidence — the datagram is attributed by the payload it carries, and a header
+rewrite reads as the mutation it is.
+
+The second is worse, and it is the one I'd most like torn apart. With a public payload function,
+*anything on the path can echo the probe's own datagram back* and be scored as an arrival. I put a
+dumb verbatim reflector in the server's place: the pre-fix probe reported **`ok`** — a clean bill of
+health for a path where the server received nothing. Any censor that swallows traffic and reflects
+the probe gets to choose what my instrument reports. The fix is domain separation: the request tag
+and the response tag are different HMACs, so an arrival means *the far end signed it*, and a
+middlebox can replay a request but cannot turn one into a response without the key. An echo that is
+attributable but unsigned is counted and never scored as delivery.
+
+Keying bought two things I didn't design for and will take. The server now answers only
+authenticated datagrams, which means it is not an open UDP reflector on a public IP — on a rented
+box that is an abuse report and a null-route away from looking exactly like a censorship finding.
+And because the server signs *what it received* rather than what it should have, whichever of the
+four (header, payload) × (as-sent, as-received) tag combinations verifies tells you **which leg**
+each rewrite happened on. Directional mangling falls out for free.
+
+It costs something honest, too. A sensor whose key doesn't match the server's receives nothing, and
+that is indistinguishable from a total block — so provisioning ends in a pre-flight run that refuses
+to start the timer unless it comes back `ok`. And there is a residual blind spot I'd rather name
+than bury: a *forward-leg* rewrite of the 20 bytes that authenticate the run still reads as a drop,
+because the server discards the datagram unanswered. That is a deliberate trade against being a
+reflector, not an oversight.
+
+Remaining limits, stated rather than discovered later: the capture path is IPv4-only today, and
+everything above is lab ground truth — kernel-injected faults on a veth pair, not a censor.
 
 ### A recruitment-free read on the datacenter-vs-consumer gap
 
@@ -134,8 +172,8 @@ install it deliberately.
 ### Reproducing
 
 ```sh
-cargo test --workspace          # 30 tests
-sudo rig/netns-calibrate.sh     # the six calibration cases, needs netns + nftables
+sudo rig/netns-test.sh          # 49 tests, run inside a private netns
+sudo rig/netns-calibrate.sh     # the eight calibration cases, needs netns + nftables
 python phase0/ooni_gap.py       # the gap read (stdlib only, live OONI + RIPEstat)
 python phase0/provider_screen.py
 ```
@@ -154,6 +192,12 @@ python phase0/provider_screen.py
 4. **The `torsf`/`riseupvpn` coverage is too thin to use.** Is there a better tool-reachability
    proxy for VPN-protocol shaping in the OONI corpus?
 5. **Anything that makes `timeout_indistinct` less likely to dominate** the live run.
+6. **The keyed echo scheme, and mostly what it still can't see.** 64-bit HMAC-SHA-256 tags, domain
+   separated by leg, with the per-marker payload doubling as the identifier. The known gap: a
+   forward-leg rewrite of the run authenticator still reads as a drop, because the server won't
+   answer it — the alternative was an open UDP reflector on a public IP. Is that the right side of
+   that trade? And is there a class of on-path behaviour that still gets to choose what this
+   instrument reports?
 
 ---
 

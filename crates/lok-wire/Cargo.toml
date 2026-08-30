@@ -1,0 +1,11 @@
+[package]
+name = "lok-wire"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The synthetic control probe's keyed datagram format, shared by sensor and echo server: HMAC-SHA-256 tags, keyed per-marker payloads, and echo attribution (intact / mutated-per-leg / reflected / unauthenticated)."
+
+[lib]
+name = "lok_wire"
+path = "src/lib.rs"

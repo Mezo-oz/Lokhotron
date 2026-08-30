@@ -1,56 +1,75 @@
-//! Marked-echo UDP server. Each datagram is `[nonce: u32 BE][marker: u32 BE]` followed by
-//! optional payload; the server echoes it back verbatim. This is the non-RU end of the
-//! UDP delta: what comes back is the "arrived" signal for that marker.
+//! Marked-echo UDP server — the non-RU end of the delta.
 //!
-//! [`DropPolicy`] is **fault-emulation for calibration only** — it lets the local
-//! netns/loopback harness inject a known `silent_drop_from_segment` so the classifier can
-//! be checked against ground truth. It has no place in a real deployment.
+//! Datagrams are the keyed v2 format defined in `lok-wire`. The server does two things
+//! that matter, and both are about not lying to the sensor:
+//!
+//! - **It admits only authenticated runs.** A datagram whose session tag doesn't verify is
+//!   discarded unanswered. Without that check this is an open UDP echo on a public IP —
+//!   a reflector, an abuse report, and a provider null-route that would arrive at the
+//!   sensor looking exactly like a censorship finding.
+//! - **It signs what it received, not what it should have received.** The response tag
+//!   covers the header and payload as they actually arrived, which is what lets the sensor
+//!   tell a forward-leg rewrite from a return-leg one (see `lok-wire`'s `classify_echo`).
+//!
+//! [`FaultPolicy`] is **fault-emulation for calibration only** — it lets the local
+//! netns/loopback harness inject a known verdict so the classifier can be checked against
+//! ground truth. It has no place in a real deployment.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, UdpSocket};
 
-/// Fault-emulation policy. Real servers always run [`DropPolicy::None`].
+use lok_wire::{build_response, is_authentic_request, parse, Key, DATAGRAM_LEN};
+
+/// Fault-emulation policy. Real servers always run [`FaultPolicy::None`].
 #[derive(Debug, Clone, Copy)]
-pub enum DropPolicy {
-    /// Echo everything.
+pub enum FaultPolicy {
+    /// Echo everything (correctly signed).
     None,
     /// Silently drop any datagram whose marker is `>= k` (emulates a drop from segment k).
     DropFromMarker(u32),
+    /// Bounce the request back byte for byte, with no response tag — impersonating the
+    /// server the way an on-path middlebox would if it wanted a dropped path to read as
+    /// healthy. The sensor must refuse to score these as arrivals.
+    ReflectVerbatim,
 }
 
-impl DropPolicy {
+impl FaultPolicy {
     fn should_echo(self, marker: u32) -> bool {
         match self {
-            DropPolicy::None => true,
-            DropPolicy::DropFromMarker(k) => marker < k,
+            FaultPolicy::None | FaultPolicy::ReflectVerbatim => true,
+            FaultPolicy::DropFromMarker(k) => marker < k,
         }
     }
-}
-
-/// The minimum datagram length: nonce + marker.
-pub const HEADER_LEN: usize = 8;
-
-/// Parse the marker out of a datagram, if it is long enough.
-pub fn marker_of(datagram: &[u8]) -> Option<u32> {
-    if datagram.len() < HEADER_LEN {
-        return None;
-    }
-    Some(u32::from_be_bytes(datagram[4..8].try_into().unwrap()))
 }
 
 /// Serve marked-echo on an already-bound socket until an error occurs. Takes ownership so
 /// tests can bind to port 0, read the assigned address, then hand the socket over.
-pub fn serve(sock: UdpSocket, policy: DropPolicy) -> std::io::Result<()> {
+///
+/// `key` must be the same secret the sensor runs with; see `deploy/DEPLOY.md`.
+pub fn serve(sock: UdpSocket, policy: FaultPolicy, key: Key) -> std::io::Result<()> {
     let mut buf = [0u8; 2048];
     loop {
         let (n, peer) = sock.recv_from(&mut buf)?;
-        let datagram = &buf[..n];
-        let Some(marker) = marker_of(datagram) else {
-            continue; // too short to be one of ours
-        };
-        if policy.should_echo(marker) {
-            sock.send_to(datagram, peer)?;
+        if n != DATAGRAM_LEN {
+            continue; // not one of ours
         }
+        let datagram: [u8; DATAGRAM_LEN] = buf[..DATAGRAM_LEN].try_into().unwrap();
+        let Some(parsed) = parse(&datagram) else {
+            continue;
+        };
+        // The admission check. Everything past here is a datagram from a run holding the
+        // key, so answering it cannot be turned into a reflection attack on a third party.
+        if !is_authentic_request(&key, &parsed) {
+            continue;
+        }
+        if !policy.should_echo(parsed.header.marker) {
+            continue;
+        }
+        let reply = match policy {
+            FaultPolicy::ReflectVerbatim => datagram,
+            _ => build_response(&key, &datagram),
+        };
+        sock.send_to(&reply, peer)?;
     }
 }
 

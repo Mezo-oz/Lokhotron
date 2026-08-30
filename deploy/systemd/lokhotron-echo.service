@@ -4,6 +4,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+# The shared secret. systemd reads this as root before dropping to the dynamic user, so the
+# file stays 0600 root-owned. Without it the server runs in open mode and will answer
+# anyone — see lok-wire's module docs on why that matters on a public IP.
+EnvironmentFile=/etc/lokhotron/echo.env
 ExecStart=/usr/local/bin/lokhotron-echo __LISTEN__
 Restart=always
 RestartSec=2

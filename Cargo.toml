@@ -8,6 +8,7 @@ members = [
     "crates/echo-server",
     "crates/probe",
     "crates/lok-capture",
+    "crates/lok-wire",
 ]
 
 [workspace.package]

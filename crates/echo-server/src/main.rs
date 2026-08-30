@@ -1,22 +1,39 @@
-//! `echo-server <addr> [drop_after_marker]`
+//! `echo-server <addr> [fault]`
 //!
-//! With no second arg, echoes everything (a real server). With a number `k`, drops markers
-//! `>= k` — fault-emulation for the calibration harness ONLY.
+//! With no second arg, echoes everything (a real server). `fault` is calibration-only
+//! fault-emulation: a number `k` drops markers `>= k`; `reflect` bounces requests back
+//! unsigned, impersonating an on-path middlebox faking delivery.
+//!
+//! The shared secret comes from `LOK_PROBE_KEY` (64 hex chars) and must match the sensor's.
+//! Without it the server runs in open mode — it still works, but its echoes prove nothing
+//! about who sent them.
 
 use std::net::{TcpListener, UdpSocket};
 use std::process::ExitCode;
 
-use echo_server::{serve, serve_tcp, DropPolicy};
+use echo_server::{serve, serve_tcp, FaultPolicy};
+use lok_wire::{Key, KEY_ENV};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let addr = args.get(1).cloned().unwrap_or_else(|| "127.0.0.1:47017".to_string());
-    let policy = match args.get(2).map(|s| s.parse::<u32>()) {
-        None => DropPolicy::None,
-        Some(Ok(k)) => DropPolicy::DropFromMarker(k),
-        Some(Err(_)) => {
-            eprintln!("drop_after_marker must be a u32");
-            return ExitCode::from(2);
+    let policy = match args.get(2).map(|s| s.as_str()) {
+        None => FaultPolicy::None,
+        Some("reflect") => FaultPolicy::ReflectVerbatim,
+        Some(k) => match k.parse::<u32>() {
+            Ok(k) => FaultPolicy::DropFromMarker(k),
+            Err(_) => {
+                eprintln!("fault must be a u32 marker or the word 'reflect'");
+                return ExitCode::from(2);
+            }
+        },
+    };
+
+    let key = match Key::from_env() {
+        Ok(k) => k,
+        Err((k, why)) => {
+            eprintln!("warning: {KEY_ENV} {why}; running in OPEN MODE (echoes prove nothing)");
+            k
         }
     };
 
@@ -46,8 +63,12 @@ fn main() -> ExitCode {
         });
     }
 
-    eprintln!("echo-server on {addr} (udp{}) policy={policy:?}", if serve_tcp_side { "+tcp" } else { "" });
-    if let Err(e) = serve(sock, policy) {
+    eprintln!(
+        "echo-server on {addr} (udp{}) policy={policy:?} keyed={}",
+        if serve_tcp_side { "+tcp" } else { "" },
+        key.is_keyed()
+    );
+    if let Err(e) = serve(sock, policy, key) {
         eprintln!("serve: {e}");
         return ExitCode::FAILURE;
     }

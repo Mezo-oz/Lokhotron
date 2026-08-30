@@ -7,12 +7,18 @@
 //! Every capture the battery runs is scoped to a [`FlowFilter`] built from a socket the
 //! probe bound *before* opening the capture, so a packet from an unrelated flow on the same
 //! box can never be read as a measurement of this path (see lok-capture's module docs).
+//!
+//! The UDP datagrams are `lok-wire`'s keyed v2 format, which is what makes an *arrival* a
+//! claim the probe can defend: an echo only counts if the far end signed it with the shared
+//! key, and a datagram whose header was rewritten in flight is still recovered — by its
+//! keyed payload — instead of being counted as a drop that never happened.
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::time::{Duration, Instant};
 
-use lok_contract::{Observation, RstInfo, Transport, Verdict};
+use lok_contract::{EchoIntegrity, Observation, RstInfo, Transport, Verdict};
+use lok_wire::{Echo, Key, Leg, SentRun, CALIBRATION_NONCE, KEY_ENV, PROBE_NONCE};
 
 /// Fraction of expected throughput below which the path is judged throttled.
 const THROTTLE_FRACTION: f64 = 0.5;
@@ -29,48 +35,19 @@ const BULK_BYTES: usize = 256 * 1024;
 /// default. The battery prefers a measured value.
 pub const DEFAULT_CONTROL_TTL: u8 = 64;
 
-/// Bytes of known payload carried after each datagram's `[nonce][marker]` header. This is
-/// what makes `payload_mutated` observable: the server echoes verbatim, so any difference
-/// between what was sent and what came back happened *in flight*.
-pub const PROBE_PAYLOAD_LEN: usize = 32;
-
-/// Nonce marking a datagram as this probe's. A mutation that rewrites the nonce or marker
-/// is not detected as `payload_mutated` — the datagram stops being recognizable as ours and
-/// reads as a drop instead. Detecting header rewrites needs the keyed-marker scheme in
-/// ECHO.md §4; the flagged verdict here is strictly *payload* mutation.
-const NONCE: u32 = 0xA1B2_C3D4;
-
-/// Nonce for the TTL-calibration datagram, kept distinct so it is never counted as a marker
-/// observation.
-const CALIBRATION_NONCE: u32 = 0xC0FF_EE00;
-
-/// The known payload for `marker` — deterministic, so the probe can recompute what it sent
-/// and compare byte for byte without keeping the sent buffers around. Varies per marker so
-/// a middlebox replaying one segment's bytes into another's slot is still a mismatch.
-pub fn payload_for(marker: u32) -> [u8; PROBE_PAYLOAD_LEN] {
-    let mut out = [0u8; PROBE_PAYLOAD_LEN];
-    for (i, b) in out.iter_mut().enumerate() {
-        *b = (marker as u8)
-            .wrapping_mul(31)
-            .wrapping_add((i as u8).wrapping_mul(7))
-            .wrapping_add(0x5A);
+/// The shared secret both ends of the delta hold, from `LOK_PROBE_KEY`. Falls back to
+/// `lok-wire`'s published open-mode key with a warning: an unkeyed run still measures
+/// drops and mutations (both ends agree on the tags either way), it just cannot prove the
+/// far end is the one that echoed. `Observation.echo.keyed` records which it was, so a
+/// verdict is never read as a stronger claim than the run supports.
+pub fn key_from_env() -> Key {
+    match Key::from_env() {
+        Ok(k) => k,
+        Err((k, why)) => {
+            eprintln!("warning: {KEY_ENV} {why}; running in OPEN MODE (echoes prove nothing)");
+            k
+        }
     }
-    out
-}
-
-/// Build one probe datagram: `[nonce BE][marker BE][known payload]`.
-fn datagram_for(nonce: u32, marker: u32) -> [u8; 8 + PROBE_PAYLOAD_LEN] {
-    let mut buf = [0u8; 8 + PROBE_PAYLOAD_LEN];
-    buf[0..4].copy_from_slice(&nonce.to_be_bytes());
-    buf[4..8].copy_from_slice(&marker.to_be_bytes());
-    buf[8..].copy_from_slice(&payload_for(marker));
-    buf
-}
-
-/// Whether an echoed datagram's payload is exactly what was sent for that marker. A short
-/// or long echo counts as mutated: the bytes that came back are not the bytes that went out.
-pub fn payload_intact(echo: &[u8], marker: u32) -> bool {
-    echo.len() == 8 + PROBE_PAYLOAD_LEN && echo[8..] == payload_for(marker)
 }
 
 fn resolve(addr: &str) -> Option<SocketAddr> {
@@ -101,8 +78,11 @@ pub fn classify(obs: &Observation) -> Verdict {
         }
     }
 
-    // A matching segment arrived but its bytes were rewritten.
-    if obs.payload_hash_mismatch {
+    // A matching datagram arrived but its bytes were rewritten in flight — content bytes,
+    // or the probe's own identifying header. The header case is only visible at all because
+    // the keyed payload still names the datagram; before that it read as a *drop*, which is
+    // a fabricated block on a path that delivered.
+    if obs.payload_hash_mismatch || obs.echo.header_mutated {
         return Verdict::PayloadMutated;
     }
 
@@ -143,37 +123,61 @@ pub fn classify(obs: &Observation) -> Verdict {
 }
 
 /// Run one UDP marked-echo battery against `server` with `count` datagrams, and build the
-/// resulting [`Observation`]. Datagram layout matches the echo server:
-/// `[nonce][marker][known payload]`. An echo whose payload differs from what was sent sets
-/// `payload_hash_mismatch` — the on-wire signal for `payload_mutated`.
+/// resulting [`Observation`]. Reads the shared key from the environment; see
+/// [`probe_once_with_key`] for the seam tests use.
 pub fn probe_once(server: &str, count: u32) -> std::io::Result<Observation> {
+    probe_once_with_key(server, count, key_from_env())
+}
+
+/// [`probe_once`] with an explicit key.
+///
+/// What counts as an arrival is the whole point: only an echo the far end **signed** does,
+/// which is why a reflected or forged datagram leaves the marker unarrived and lands in
+/// [`EchoIntegrity`] instead. A datagram whose header was rewritten in flight *is* an
+/// arrival — recovered by its keyed payload — and sets the mutation signal rather than
+/// silently shortening the contiguous run.
+pub fn probe_once_with_key(server: &str, count: u32, key: Key) -> std::io::Result<Observation> {
     let sock = UdpSocket::bind("0.0.0.0:0")?;
     sock.connect(server)?;
     sock.set_read_timeout(Some(Duration::from_millis(300)))?;
 
+    let run = SentRun { key, nonce: PROBE_NONCE, session: lok_wire::new_session(), count };
     for marker in 0..count {
-        sock.send(&datagram_for(NONCE, marker))?;
+        sock.send(&run.request(marker))?;
     }
 
     let mut arrived = vec![false; count as usize];
-    let mut mutated = false;
+    let mut echo = EchoIntegrity { keyed: key.is_keyed(), ..Default::default() };
+    let mut payload_mutated = false;
+    let mut legs: (Option<Leg>, Option<Leg>) = (None, None);
     let mut recv = [0u8; 2048];
-    loop {
-        match sock.recv(&mut recv) {
-            Ok(n) if n >= 8 => {
-                let echo = &recv[..n];
-                let rn = u32::from_be_bytes(echo[0..4].try_into().unwrap());
-                let rm = u32::from_be_bytes(echo[4..8].try_into().unwrap());
-                if rn == NONCE && (rm as usize) < arrived.len() {
-                    arrived[rm as usize] = true;
-                    if !payload_intact(echo, rm) {
-                        mutated = true;
-                    }
+    // The read timeout ends the loop: no more echoes are coming.
+    while let Ok(n) = sock.recv(&mut recv) {
+        match run.classify_echo(&recv[..n]) {
+            Echo::Intact { marker } => arrived[marker as usize] = true,
+            Echo::Mutated { marker, header, payload } => {
+                arrived[marker as usize] = true;
+                if header.is_some() {
+                    echo.header_mutated = true;
+                    legs.0 = header;
+                }
+                if payload.is_some() {
+                    payload_mutated = true;
+                    legs.1 = payload;
                 }
             }
-            Ok(_) => {}
-            Err(_) => break, // read timeout: no more echoes coming
+            Echo::Reflected { .. } => echo.reflected += 1,
+            Echo::Unauthenticated => echo.unauthenticated += 1,
         }
+    }
+
+    // Which leg a rewrite happened on is a real finding (mangling is often directional) but
+    // has nowhere to go in the contract yet, so it is reported to the operator, not stored.
+    if echo.header_mutated || payload_mutated || echo.reflected > 0 || echo.unauthenticated > 0 {
+        eprintln!(
+            "echo integrity: header_mutated={:?} payload_mutated={:?} reflected={} unauthenticated={} keyed={}",
+            legs.0, legs.1, echo.reflected, echo.unauthenticated, echo.keyed
+        );
     }
 
     // Highest *contiguous* marker that arrived.
@@ -192,11 +196,12 @@ pub fn probe_once(server: &str, count: u32) -> std::io::Result<Observation> {
         tcp_reachable: true, // UDP-only entry point assumes the path; probe_battery measures it
         segments_sent: count,
         highest_marker_arrived: highest,
-        payload_hash_mismatch: mutated,
+        payload_hash_mismatch: payload_mutated,
         rst: None,
         throughput_bps: None,
         expected_bps: None,
         active_probe_forwarded: false,
+        echo,
     })
 }
 
@@ -451,8 +456,8 @@ pub fn measure_throughput(addr: &str) -> Option<u64> {
 /// Linux + `CAP_NET_RAW`; falls back to [`DEFAULT_CONTROL_TTL`] when capture is unavailable
 /// or no reply is seen.
 #[cfg(target_os = "linux")]
-fn calibrate_control_ttl(udp_addr: &str) -> u8 {
-    fn measure(udp_addr: &str) -> Option<u8> {
+fn calibrate_control_ttl(udp_addr: &str, key: Key) -> u8 {
+    fn measure(udp_addr: &str, key: Key) -> Option<u8> {
         use lok_capture::{FlowFilter, L4Proto};
 
         let sa = resolve(udp_addr)?;
@@ -463,15 +468,18 @@ fn calibrate_control_ttl(udp_addr: &str) -> u8 {
         sock.connect(sa).ok()?;
         let cap = lok_capture::AfPacketCapture::open().ok()?;
         let filter = FlowFilter::inbound(peer_ip, peer_port, local_port, L4Proto::Udp);
-        sock.send(&datagram_for(CALIBRATION_NONCE, 0)).ok()?;
+        // Its own session and nonce: the server only answers authenticated runs, and the
+        // calibration datagram must never be counted as a marker observation.
+        let run = SentRun { key, nonce: CALIBRATION_NONCE, session: lok_wire::new_session(), count: 1 };
+        sock.send(&run.request(0)).ok()?;
         let deadline = Instant::now() + Duration::from_millis(400);
         cap.observe_peer_ttl(&filter, deadline).ok().flatten()
     }
-    measure(udp_addr).unwrap_or(DEFAULT_CONTROL_TTL)
+    measure(udp_addr, key).unwrap_or(DEFAULT_CONTROL_TTL)
 }
 
 #[cfg(not(target_os = "linux"))]
-fn calibrate_control_ttl(_udp_addr: &str) -> u8 {
+fn calibrate_control_ttl(_udp_addr: &str, _key: Key) -> u8 {
     DEFAULT_CONTROL_TTL
 }
 
@@ -484,20 +492,22 @@ fn calibrate_control_ttl(_udp_addr: &str) -> u8 {
 /// otherwise.
 pub fn probe_battery(udp_addr: &str, tcp_addr: &str, count: u32) -> std::io::Result<Observation> {
     let tcp = default_tcp_probe();
-    let control_ttl = calibrate_control_ttl(udp_addr);
-    probe_battery_with(udp_addr, tcp_addr, count, tcp.as_ref(), control_ttl)
+    let key = key_from_env();
+    let control_ttl = calibrate_control_ttl(udp_addr, key);
+    probe_battery_with(udp_addr, tcp_addr, count, tcp.as_ref(), control_ttl, key)
 }
 
-/// [`probe_battery`] with an injectable TCP probe and control TTL, so the RST wiring can be
-/// exercised with a fake reset in tests (no root) and the real capture under the rig.
+/// [`probe_battery`] with an injectable TCP probe, control TTL and key, so the RST wiring
+/// can be exercised with a fake reset in tests (no root) and the real capture under the rig.
 pub fn probe_battery_with(
     udp_addr: &str,
     tcp_addr: &str,
     count: u32,
     tcp: &dyn TcpProbe,
     control_ttl: u8,
+    key: Key,
 ) -> std::io::Result<Observation> {
-    let mut obs = probe_once(udp_addr, count)?;
+    let mut obs = probe_once_with_key(udp_addr, count, key)?;
     let res = tcp.run(tcp_addr, control_ttl);
     obs.tcp_reachable = res.reachable;
     obs.rst = res.rst;

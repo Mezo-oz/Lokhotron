@@ -32,7 +32,9 @@ trees."
 
 **Phase 1 step 0 is built and verified on real packets** — the probe battery, the AF_PACKET
 capture and the verdict classifier are calibrated against kernel-injected faults in a netns rig
-(6/6 cases, including a negative case proving another flow's RST cannot contaminate a verdict).
+(8/8 cases, three of them negative: another flow's RST cannot contaminate a verdict, a rewrite of
+the probe's own header is not reported as a drop, and a reflector cannot make a dead path read
+healthy).
 The provisioning scripts exist; no hosts are rented yet. **Phase 0's gap read is done**
 ([phase0/](phase0/)) and it changed the provisioning plan: block rates spread 87-96 pp *between RU
 hosting providers*, so which provider you rent decides what you can measure.

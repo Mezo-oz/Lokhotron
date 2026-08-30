@@ -1,9 +1,9 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-08-27 (flow-scoped capture + on-wire payload
-> mutation, rig 6/6; Phase 0 gap read; RU legal/sanctions check; provider shortlist). **Everything
-> that can be done without renting hosts is now done — the next step is provisioning.**
+> or an open question closes. Last updated: 2026-08-29 (keyed echo protocol: a rewritten header is
+> no longer a fabricated drop, and a reflector can no longer fake delivery; rig 8/8). **Everything
+> that can be done without renting hosts is done — the next step is provisioning.**
 
 ## What it is
 
@@ -17,17 +17,27 @@ differential technique.
 ## Repo
 
 `github.com/Mezo-oz/Lokhotron` — public, MIT. Design settled; **Phase 1 scaffold + TCP increment
-built and verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **30
-tests pass** (2 lok-contract + 9 lok-capture + 19 calibration incl. real loopback end-to-end).
+built and verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **49
+tests pass** (16 lok-wire + 2 lok-contract + 9 lok-capture + 22 calibration incl. real loopback
+end-to-end).
 
-Crates: `lok-contract` (Verdict/Observation/Transport/TelemetryReport/WeightedBundle — types +
-`sample`/`verify_stub`), `echo-server` (marked-echo UDP **+ TCP byte-echo**; DropPolicy =
-calibration fault-emulation only), `probe` (`classify` pure fn; UDP `probe_once` with a known
-payload block; **`tcp_reachable` + `measure_throughput` + `probe_battery`**; bind-before-connect
-`BoundTcpSocket` so the capture can be flow-scoped; `tests/calibration.rs`), `lok-capture`
-(`AfPacketCapture` + **`FlowFilter`/`rst_from_flow`/`peer_ttl_from_flow`** + `watch_for_rst` +
-`parse_ipv4_tcp_rst` + `ipv4_from_frame` + `is_ttl_anomalous`), `rig/netns-calibrate.sh`
-(**six cases**, all on real kernel-injected faults).
+Run the suite with **`sudo rig/netns-test.sh`**, which runs it inside a private network namespace.
+The loopback cases are the ones that prove probe and classifier agree on ground truth, so they must
+not be the ones skipped when the host's loopback is unusable — this WSL instance swallows IPv4
+loopback UDP specifically (TCP to `127.0.0.1` works, `::1` works, UDP to `127.0.0.1` vanishes),
+which fails every UDP case for a reason that has nothing to do with the code.
+
+Crates: `lok-contract` (Verdict/Observation/EchoIntegrity/Transport/TelemetryReport/WeightedBundle
+— types + `sample`/`verify_stub`), **`lok-wire`** (the keyed v2 datagram both ends agree on:
+in-tree HMAC-SHA-256 against RFC 4231 vectors, keyed per-marker payloads, and `classify_echo` →
+intact / mutated-per-leg / reflected / unauthenticated), `echo-server` (marked-echo UDP **+ TCP
+byte-echo**; admits only key-authenticated runs; FaultPolicy = calibration fault-emulation only),
+`probe` (`classify` pure fn; keyed UDP `probe_once`; **`tcp_reachable` + `measure_throughput` +
+`probe_battery`**; bind-before-connect `BoundTcpSocket` so the capture can be flow-scoped;
+`tests/calibration.rs`), `lok-capture` (`AfPacketCapture` +
+**`FlowFilter`/`rst_from_flow`/`peer_ttl_from_flow`** + `watch_for_rst` + `parse_ipv4_tcp_rst` +
+`ipv4_from_frame` + `is_ttl_anomalous`), `rig/netns-calibrate.sh` (**eight cases**, all on real
+kernel-injected faults), `rig/netns-test.sh` (the test suite in a private netns).
 
 **Closed:** real `tcp_reachable` (a full UDP blackout with TCP up reads `udp_class_drop`; TCP-down
 reads `timeout_indistinct` instead of masking); real bulk throughput → `throttle_to_rate`; and
@@ -45,29 +55,61 @@ unavailable.
 **Verified end-to-end on real packets** (`sudo rig/netns-calibrate.sh`, WSL Ultramarine): clean →
 `ok`; drop-from-4 → `silent_drop_from_segment{n:4}`; `tc tbf` 128 kbit → `throttle_to_rate`
 (measured ~124 kbit); `nft`-mangled RST (TTL 200) → `injected_rst_at_sni` (judged against the
-calibrated ~64); `nft` raw-payload rewrite mid-path → `payload_mutated`; and the **negative case**
-— a foreign flow's mangled RSTs in the air during a healthy run → still `ok`. All six PASS.
+calibrated ~64); `nft` raw-payload rewrite mid-path → `payload_mutated`; a rewrite of the probe's
+own header → `payload_mutated`, not a drop; and two **negative cases** — a foreign flow's mangled
+RSTs in the air during a healthy run → still `ok`, and a reflector bouncing the probe back →
+`udp_class_drop`, not `ok`. All eight PASS.
 
-**Both new cases were confirmed as real regressions**, not decoration: the pre-change binaries,
-run against the same rig in a detached worktree, reported `ok` for the mutated-payload case (blind
-to it) and `injected_rst_at_sni` for the foreign-RST case — a *fabricated finding on a healthy
-path*, which is the single worst thing this instrument could do live.
+**Every new case is confirmed as a real regression before it is added**, not decoration: the
+pre-change binaries are run against the same injected fault in a detached worktree and the wrong
+verdict they produce is recorded. A case that passes on both sides of a change proves nothing. So
+far that has caught four *fabricated findings* — `injected_rst_at_sni` on a healthy path, blindness
+to a payload rewrite, `udp_class_drop` on a path that delivered everything, and `ok` on a path the
+server never received — which is the class of failure that would make this instrument worse than
+having no instrument.
 
 **Closed since (2026-08-27):** captures are **flow-scoped**. `FlowFilter` pins peer IP, peer port,
 our port and protocol; the probe binds its TCP socket (`BoundTcpSocket`, bind-before-connect via
 libc — `std` has no such API) and its UDP socket *before* opening the capture, so the filter can
 name a real local port instead of a wildcard. `payload_mutated` is now on the wire: each datagram
-carries `[nonce][marker][32 bytes of known payload]`, the payload is a deterministic function of
-the marker (recomputed, not retained; a replay into another marker's slot is still a mismatch),
-and the rig rewrites a byte mid-path with `nft @th,128,8 set` — the kernel fixes the UDP checksum,
-exactly as a real middlebox must.
+carries a known payload block, the payload is a function of the marker (recomputed, not retained;
+a replay into another marker's slot is still a mismatch), and the rig rewrites a byte mid-path with
+`nft` raw-payload set — the kernel fixes the UDP checksum, exactly as a real middlebox must.
+*(Superseded on 2026-08-29: the payload is now keyed and the layout is v2 — see below and ECHO
+§2a. The offsets in this paragraph no longer apply.)*
 
-**Caveats / not fully closed:** a rewrite of the *nonce or marker* still reads as a drop, not
-`payload_mutated` — the datagram stops being recognizable as ours. Closing that needs the keyed
-marker scheme (ECHO §2), not this MVP. IPv4 only in the capture path (`peer_v4` returns `None` on
-v6 and the battery falls back to the default control TTL). `WeightedBundle::verify_stub` is a
-placeholder (real ed25519 with the control plane, Phase 2). This is all still **lab** ground-truth
-— the next real milestone is a live RU/non-RU VPS pair.
+**Closed since (2026-08-29): the echo protocol is keyed** ([ECHO.md](ECHO.md) §2a, crate
+`lok-wire`). Two shapes that produced a *wrong* verdict rather than a missing one, both confirmed
+against the pre-change binaries in a detached worktree before the fix was called a fix:
+
+- **A rewritten header read as a drop.** Rewriting the marker mid-path made the echo unrecognizable,
+  and the pre-change probe reported `udp_class_drop` — "UDP is dead on this path" — against a path
+  that delivered all eight datagrams. The 32-byte payload is now `HMAC(K, nonce‖marker‖session)`, so
+  it identifies the datagram on its own; a destroyed header no longer destroys the evidence, and the
+  rewrite reads as `payload_mutated`.
+- **Delivery could be faked.** With a public payload function, anything on the path could echo the
+  probe's own datagram back and be scored as an arrival: against a dumb verbatim reflector the
+  pre-change probe reported **`ok`** — a clean bill of health for a path where the server received
+  nothing. Request and response tags are now different HMACs, so an arrival means the far end signed
+  it. An echo that is attributable but unsigned is counted (`EchoIntegrity`) and never scored as
+  delivery.
+
+Two things fell out that weren't the goal. The server now answers **only** authenticated datagrams,
+so it is not an open UDP reflector on a public IP — which on a rented box is an abuse report and a
+provider null-route away from looking exactly like a censorship finding. And because the server
+signs *what it received*, which of the four (header, payload) × (as-sent, as-received) tag
+combinations verifies tells you **which leg** a rewrite happened on.
+
+**Caveats / not fully closed:** a *forward-leg* rewrite of the 20 bytes that authenticate the run
+(nonce, session, session tag) still reads as a drop — the server discards it unanswered, which is
+the deliberate price of not being a reflector. A mismatched key is indistinguishable from a total
+block, so `deploy/sensor-setup.sh` ends in a pre-flight run and refuses to enable the timer unless
+it comes back `ok` (`LOK_FORCE_ENABLE=1` to override). IPv4 only in the capture path (`peer_v4`
+returns `None` on v6 and the battery falls back to the default control TTL). Mutation *leg* is
+reported to the operator on stderr but has nowhere to go in the contract yet — promote it when the
+collector exists. `WeightedBundle::verify_stub` is a placeholder (real ed25519 with the control
+plane, Phase 2). This is all still **lab** ground-truth — the next real milestone is a live
+RU/non-RU VPS pair.
 
 ## Three-tree architecture (a security boundary, not tidiness)
 
@@ -126,13 +168,15 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Phase | State |
 |---|---|
 | Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
-| Phase 1 **step 0** (calibration harness) | **Built + green** — 30 tests pass, clippy clean. |
+| Phase 1 **step 0** (calibration harness) | **Built + green** — 49 tests pass, clippy clean. |
 | Phase 1 TCP increment (real reachability + throughput) | **Done + green.** |
 | Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done + verified on the wire** (rig, root). |
 | Per-route control-TTL calibration | **Done + verified** — RST judged against measured ~64, not assumed. |
-| Run the netns rig under root | **Passed 6/6** on real kernel-injected faults (WSL Ultramarine; 4 cases 2026-08-26, payload-mutation + foreign-RST cases 2026-08-27). |
+| Run the netns rig under root | **Passed 8/8** on real kernel-injected faults (WSL Ultramarine; 4 cases 2026-08-26, payload-mutation + foreign-RST 2026-08-27, header-rewrite + reflector 2026-08-29). |
 | Flow-scoped capture (5-tuple filter) | **Done + verified on the wire** — foreign RSTs no longer contaminate a clean verdict (rig case 6). |
-| On-wire `payload_mutated` | **Done + verified on the wire** — known payload block + `nft` raw-payload rewrite mid-path (rig case 5). |
+| On-wire `payload_mutated` | **Done + verified on the wire** — keyed payload block + `nft` raw-payload rewrite mid-path (rig case 5). |
+| Keyed echo protocol (`lok-wire`) | **Done + verified on the wire** — a rewritten header is recovered, not reported as a drop (rig case 7); a reflector cannot fake delivery (rig case 8). Both confirmed as real regressions against the pre-change binaries. |
+| Key provisioning + the mismatched-key foot-gun | **Done** — generated by `server-setup.sh`, carried to sensors, and gated by a pre-flight run that refuses to enable the timer unless it comes back `ok`. |
 | Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
 | RU legal / sanctions check | **Done** — [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md). Research pass, not advice; re-read at rent time. |
 | Provider screen (OFAC + OONI) | **Done** — [phase0/PROVIDER-SHORTLIST.md](phase0/PROVIDER-SHORTLIST.md). 22 candidates; Aeza designated; 3 suggested spanning path profiles. |
@@ -204,7 +248,7 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
      env file before the timer is enabled.
 
 4. **Run the battery live for a week, and watch the `timeout_indistinct` rate.** The instrument is
-   calibrated 6/6 against kernel-injected faults, so a blank is now a *finding* ("the TSPU is
+   calibrated 8/8 against kernel-injected faults, so a blank is now a *finding* ("the TSPU is
    uniform at this granularity") rather than "our tool is blind" — that two-sided honesty is what
    the calibration bought. Compare the three sensors against each other: divergence between
    providers is itself the Correction 3 result, measured on our own instrument instead of inferred
@@ -227,7 +271,10 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
 
 ### Recently closed
 
-- Phase 1 step 0 calibration harness — built, and verified on the wire 6/6.
+- **The keyed echo protocol** (2026-08-29) — the two shapes that made the instrument report
+  something *false* rather than nothing: a rewritten header read as a drop, and a reflector read as
+  a healthy path. Rig 8/8, and both confirmed as real regressions against the pre-change binaries.
+- Phase 1 step 0 calibration harness — built, and verified on the wire.
 - Flow-scoped capture and on-wire `payload_mutated` — the two shared-vantage caveats that would
   have produced fabricated findings on a rented box.
 - Phase 0 gap read, RU legal/sanctions check, and the provider screen — see the phase table.

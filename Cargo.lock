@@ -11,6 +11,9 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 [[package]]
 name = "echo-server"
 version = "0.1.0"
+dependencies = [
+ "lok-wire",
+]
 
 [[package]]
 name = "etherparse"
@@ -50,6 +53,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lok-wire"
+version = "0.1.0"
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -63,6 +70,7 @@ dependencies = [
  "libc",
  "lok-capture",
  "lok-contract",
+ "lok-wire",
  "serde_json",
 ]
 

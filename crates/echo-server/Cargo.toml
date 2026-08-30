@@ -4,11 +4,14 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Marked-echo UDP server: the non-RU end of the delta for the UDP battery. DropPolicy is fault-emulation for calibration ONLY."
+description = "Marked-echo UDP server: the non-RU end of the delta for the UDP battery. Admits only key-authenticated runs (never an open reflector); FaultPolicy is fault-emulation for calibration ONLY."
 
 [lib]
 name = "echo_server"
 path = "src/lib.rs"
+
+[dependencies]
+lok-wire = { path = "../lok-wire" }
 
 [[bin]]
 name = "echo-server"

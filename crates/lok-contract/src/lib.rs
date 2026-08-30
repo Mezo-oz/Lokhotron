@@ -38,7 +38,11 @@ pub enum Verdict {
     UdpClassDrop,
     /// (server-side) a Reality probe was forwarded to the real cover site.
     ActiveProbeObserved,
-    /// A matching segment arrived but its payload bytes were rewritten in flight.
+    /// A segment arrived but its bytes were rewritten in flight — content bytes, or the
+    /// probe's own identifying header (recovered via the keyed payload; see
+    /// [`EchoIntegrity`]). One verdict covers both: on the wire a rewrite of the probe
+    /// header is a rewrite of UDP payload bytes like any other, and the client can act on
+    /// "this path mangles bytes" but not on where in our datagram it happened.
     PayloadMutated,
     /// Died with no distinguishing shape. The honest null verdict — tracked as a
     /// first-class rate, never swept aside.
@@ -86,6 +90,32 @@ pub struct RstInfo {
     pub ttl_anomaly: bool,
 }
 
+/// What the keyed echo channel saw beyond bare arrival counts (see `lok-wire`).
+///
+/// These are **measurement-integrity** facts, not statements about the transport, which is
+/// why they live here and not in the verdict vocabulary: "someone reflected our probe"
+/// describes the instrument's channel, and the synthetic control probe's channel has no
+/// counterpart in a real transport. A verdict says what happened to traffic; these say how
+/// much to trust that verdict.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EchoIntegrity {
+    /// An arrived datagram's identifying header was rewritten in flight, and it was
+    /// recovered by its keyed payload instead of its marker. Before the keyed format this
+    /// read as a *drop* — a fabricated block on a path that delivered.
+    pub header_mutated: bool,
+    /// Echoes that were verbatim copies of the probe's own requests: something on the path
+    /// bounced the probe back rather than delivering it. Never scored as arrivals.
+    pub reflected: u32,
+    /// Echoes carrying no valid far-end tag that could not be attributed to a sent
+    /// datagram. Non-zero means something is fabricating echoes, or mangling them past
+    /// recognition; either way they are not evidence of delivery.
+    pub unauthenticated: u32,
+    /// Whether a real shared secret was in use. Without one the tags use the published
+    /// open-mode key: mutation detection still holds, forgery detection does not — so a
+    /// clean verdict from an unkeyed run is a weaker claim.
+    pub keyed: bool,
+}
+
 /// The joined sent-vs-arrived delta for a single probe run. Pure input to [`crate`]'s
 /// consumers' classifier — carries no user identifier, no precise timestamp (see the
 /// k-anon rules in CONTRACT.md Part 2).
@@ -101,7 +131,9 @@ pub struct Observation {
     pub segments_sent: u32,
     /// Highest *contiguous* marker observed as arrived (`None` = nothing arrived).
     pub highest_marker_arrived: Option<u32>,
-    /// A matching segment arrived but its payload hash differed.
+    /// A matching segment arrived but its payload hash differed. A rewritten *header* is
+    /// reported separately in [`EchoIntegrity::header_mutated`] and maps to the same
+    /// verdict — both are "bytes rewritten in flight".
     pub payload_hash_mismatch: bool,
     /// Inbound RST seen by the sensor, if any.
     pub rst: Option<RstInfo>,
@@ -111,6 +143,10 @@ pub struct Observation {
     pub expected_bps: Option<u64>,
     /// Server-side: a Reality probe was forwarded to the real cover host.
     pub active_probe_forwarded: bool,
+    /// Integrity of the echo channel itself. Additive: an older record without it
+    /// deserializes to the all-clear default.
+    #[serde(default)]
+    pub echo: EchoIntegrity,
 }
 
 impl Observation {
@@ -127,6 +163,7 @@ impl Observation {
             throughput_bps: None,
             expected_bps: None,
             active_probe_forwarded: false,
+            echo: EchoIntegrity::default(),
         }
     }
 }

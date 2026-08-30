@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 lok-contract = { path = "../lok-contract" }
 lok-capture = { path = "../lok-capture" }
+lok-wire = { path = "../lok-wire" }
 serde_json = { workspace = true }
 
 # Bind-before-connect (to know our own port before the capture opens) has no std API.
@@ -25,3 +26,4 @@ libc = { workspace = true }
 
 [dev-dependencies]
 echo-server = { path = "../echo-server" }
+lok-wire = { path = "../lok-wire" }
