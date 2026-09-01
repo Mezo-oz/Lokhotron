@@ -1,9 +1,12 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-08-29 (keyed echo protocol: a rewritten header is
-> no longer a fabricated drop, and a reflector can no longer fake delivery; rig 8/8). **Everything
-> that can be done without renting hosts is done — the next step is provisioning.**
+> or an open question closes. Last updated: 2026-09-01 (re-ran both pre-spend screens — runbook
+> step 1 — before renting: OFAC gate unchanged since 2026-08-27, Aeza still SDN-designated and the
+> control case still fires, MTW/Timeweb/Beget still clear; OONI path profiles still Beget near-clean
+> / Timeweb protocol-selective / MTW consumer-like, Correction-3 sign-flip intact. Prior: 2026-08-29
+> keyed echo protocol, rig 8/8). **Everything that can be done without renting hosts is done — the
+> next step is provisioning, and the pre-spend screens are fresh as of today.**
 
 ## What it is
 
@@ -226,6 +229,14 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
    each move month to month, and both outputs are dated snapshots:
    `python phase0/provider_screen.py` and `python phase0/ooni_gap.py`. If a provider's OFAC status
    or path profile changed, the shortlist changes with it.
+   **Re-run 2026-09-01** ([phase0/PROVIDER-SCREEN-2026-09-01.md](phase0/PROVIDER-SCREEN-2026-09-01.md),
+   [phase0/gap-2026-09-01.md](phase0/gap-2026-09-01.md)): nothing flipped. Aeza still SDN-designated
+   (control fires → screen not broken); MTW/Timeweb/Beget still clear (MTW's 4 hits are the same
+   generic `ekspert` token collisions, prior-cleared). Path profiles hold: Beget near-clean
+   (tor 16% / psiphon 3.7% / telegram 7.4%), Timeweb selective (99.6% / 7.9% / 98.6%), MTW
+   consumer-like (psiphon 78%); Correction-3 sign-flip intact (psiphon +64pp, telegram −2.7pp,
+   tor +7.7pp). **Shortlist unchanged — clear to rent.** Re-run again if more than a few weeks pass
+   before provisioning.
 
 2. **Rent.** One non-RU echo server (anywhere outside RU with a stable public IP) and **2-3 RU
    sensors at different providers** — the spread between RU hosting providers is 87-96 pp, so one
