@@ -56,15 +56,20 @@ systemctl daemon-reload
 # A wrong key, a closed provider security group, and a real total block all look identical
 # in the data: nothing comes back. Distinguish them here, once, while you still have the
 # context to fix the first two — rather than three days into a run whose every row says
-# "blocked".
+# "blocked". This is the one check that needs a human: the per-run gate in run-battery.sh
+# catches everything the box can know about itself (binary, config, CAP_NET_RAW, probe
+# crash) and records it as `not_evaluated`, but "wrong key vs. real block" is silence either
+# way and only you, right now, can tell which.
 echo "pre-flight: one battery run against $SERVER ..."
 preflight="$(LOK_PROBE_KEY="$KEY" /usr/local/bin/lokhotron-probe "$SERVER" "$COUNT" 2>&1 || true)"
 echo "  -> $preflight"
-if echo "$preflight" | grep -q '"kind":"ok"'; then
+if grep -q '"kind":"ok"' <<< "$preflight"; then
     systemctl enable --now lokhotron-sensor.timer
     echo "OK: sensor battery every ${INTERVAL}s -> /var/log/lokhotron/battery.jsonl"
     echo "    one-shot now:  systemctl start lokhotron-sensor.service"
     echo "    watch:         tail -f /var/log/lokhotron/battery.jsonl"
+    echo "    health:        grep -c '\"kind\":\"not_evaluated\"' /var/log/lokhotron/battery.jsonl"
+    echo "                   (instrument failures — never censorship; also: systemctl --failed)"
 elif [ -n "${LOK_FORCE_ENABLE:-}" ]; then
     systemctl enable --now lokhotron-sensor.timer
     echo "WARNING: pre-flight was not ok; enabled anyway because LOK_FORCE_ENABLE is set."

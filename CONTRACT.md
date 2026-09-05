@@ -1,4 +1,4 @@
-# Lokhotron — the contract (v0.1 draft)
+# Lokhotron — the contract (v0.2 draft)
 
 The **only** thing that crosses the boundary between Lokhotron (tree #1, this repo) and the
 client (tree #2, its own repo / Amnezia upstream). It is a **versioned spec, not a shared
@@ -43,22 +43,52 @@ pointed at the live adversary.
 > probe" describes the instrument's own channel, and the synthetic control probe's channel has no
 > counterpart in a real transport.
 | `timeout-indistinct` | died with no distinguishing shape | either | the null verdict — see note |
+| `not-evaluated` | **no measurement was made** — the instrument could not run or could not be trusted | sensor-side | `reason` (closed set, below) — see note |
 
 **`timeout-indistinct` is the honest failure mode.** If most blocks land here, the delta isn't
 informative and the thesis is in trouble — that's the thing Phase 1 exists to find out in week
 one. Track its rate as a first-class metric.
 
+**`not-evaluated` is not a failure mode of the path — it is a failure mode of the sensor**, and it
+is in the closed set (v0.2) precisely so nobody can forget to handle it. Every other verdict,
+`timeout-indistinct` included, says *the probe ran and this is what the path did*. `not-evaluated`
+says *the probe did not run, or ran without the capability that keeps its columns honest*, and
+therefore says nothing about the TSPU. Before 0.2 the run wrapper recorded all of those as
+`timeout-indistinct`, and a suspended box would have produced a week of "the TSPU is uniform at
+this granularity". The `reason` is a closed enum, additive by minor version like the verdicts:
+
+| reason | meaning |
+|---|---|
+| `probe_missing` | the probe binary is missing or not executable |
+| `config_invalid` | sensor config unreadable, or lacks `SERVER` / a 64-hex `LOK_PROBE_KEY` (an unkeyed run cannot prove delivery) |
+| `no_capability` | no `CAP_NET_RAW`, so the capture that tells an injected RST from a blackout could not exist — the run would have moved real RST-blocks into `timeout-indistinct` |
+| `probe_error` | the probe exited non-zero before a verdict (bind failure, unresolvable address, ICMP port-unreachable from the echo *host*, killed on timeout); its stderr rides in `detail` |
+| `malformed_verdict` | the probe printed something that is not a verdict this contract knows |
+
+`detail` is optional free text for the operator — allowed *because* nothing aggregates on it.
+Rules for consumers: **exclude `not-evaluated` from every verdict rate** (in `lok-contract`,
+`Verdict::is_measurement()`); track its own rate as an instrument-health metric next to the
+`timeout-indistinct` rate; and never let it reach a client bundle's inputs. What it deliberately
+does not cover: whether the *echo server* was up. From the RU side a dead server, a wrong key and
+a total block are the same silence, and the only host a sensor may probe is our own — so that case
+is settled at analysis from the server's journal and from all sensors going quiet together, not by
+a check on the sensor (see `deploy/run-battery.sh`).
+
 Verdicts are **additive by minor version**: new verdicts may be appended; existing codes never
 change meaning. A client seeing an unknown verdict in aggregated data treats it as
-`timeout-indistinct`.
+`timeout-indistinct` — which is exactly why a 0.1 consumer must not ingest 0.2 sensor data: it
+would coerce `not-evaluated` back into the null verdict. Version-gate the reader before the run.
 
 > **Reconcile against dpi-bench's property vocabulary.** This taxonomy and dpi-bench's per-strategy
 > property vocabulary are mirror images: dpi-bench asserts what a *well-formed* split/seqovl/fake
 > looks like at the byte level; a verdict here names what a *tampered* one looks like on the wire.
 > Knowing the former sharpens the latter (esp. `payload-mutated` and `silent-drop-from-segment-N`).
-> When that dpi-bench work firms up, **pull** its byte-level properties into this table — a one-way
-> import, never a dependency that blocks either track. dpi-bench is a separate session; this file
-> stays the source of truth for the wire-side taxonomy. How each verdict is *derived* from the
+> **First pull done (2026-09-04):** dpi-bench's third state — `exit 2 / mut?`, "I cannot judge this
+> row" as distinct from pass and finding, which it grew after a rig-not-up run read as 29 findings —
+> is `not-evaluated` above. Its byte-level *properties* were checked and do **not** transfer:
+> they describe zapret2's own dissector, not the TSPU. Any future pull stays one-way, never a
+> dependency that blocks either track; dpi-bench is a separate session and this file stays the
+> source of truth for the wire-side taxonomy. How each verdict is *derived* from the
 > sent-vs-arrived delta is specified in [ECHO.md](ECHO.md).
 
 ---
@@ -72,7 +102,7 @@ Conceptual record (pre-aggregation, never transmitted raw from a client):
 
 ```
 {
-  contract_version:  "0.1",
+  contract_version:  "0.2",
   asn:               uint32,          // operator ASN — coarse, no sub-prefix
   region:            string,          // coarse region code, not city/GPS
   transport:         enum,            // amneziawg | vless-reality | ss2022 | obfs4 | plain-tls-control
@@ -105,7 +135,7 @@ winner** — argmax builds a monoculture (DESIGN, Correction 1). The client **sa
 
 ```
 {
-  contract_version:  "0.1",
+  contract_version:  "0.2",
   issued_bucket:     uint64,          // coarse issue time
   ttl_buckets:       uint16,          // client stops trusting after this
   scope:             { asn: uint32, region: string },   // ONE slice per bundle

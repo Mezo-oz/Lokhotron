@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// Contract version stamped on every crossing artifact. `major.minor`; unknown major
 /// is rejected by the client rather than guessed.
-pub const CONTRACT_VERSION: &str = "0.1";
+pub const CONTRACT_VERSION: &str = "0.2";
 
 // ---------------------------------------------------------------------------
 // Part 1 — verdict vocabulary (closed taxonomy)
@@ -21,8 +21,15 @@ pub const CONTRACT_VERSION: &str = "0.1";
 /// The enumerated language of what the TSPU did. Closed set: new verdicts are added by
 /// minor version, existing codes never change meaning. Serializes as `{"kind": "...", ...}`.
 ///
-/// Reconcile against dpi-bench's property vocabulary as it firms up (one-way pull; see
-/// CONTRACT.md Part 1). Derivation of each verdict from the sent-vs-arrived delta is in ECHO.md.
+/// Every variant but one is a claim about the TSPU. The exception, [`Verdict::NotEvaluated`],
+/// is a claim about the *instrument* — and it is in the closed set on purpose: the failure
+/// this guards against is a dead sensor whose every row reads as censorship, and a state that
+/// lives outside the enum is a state a consumer can forget to check. Inside it, an exhaustive
+/// `match` refuses to compile until the consumer has decided what to do with "no
+/// measurement". (The first thing pulled from dpi-bench's vocabulary, 2026-09: its `exit 2 /
+/// mut?` state. Its byte-level properties stay out; see CONTRACT.md Part 1.)
+///
+/// Derivation of each verdict from the sent-vs-arrived delta is in ECHO.md.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Verdict {
@@ -45,8 +52,54 @@ pub enum Verdict {
     /// "this path mangles bytes" but not on where in our datagram it happened.
     PayloadMutated,
     /// Died with no distinguishing shape. The honest null verdict — tracked as a
-    /// first-class rate, never swept aside.
+    /// first-class rate, never swept aside. This is a claim about the *path*: the probe
+    /// ran to completion, its channel was sound, and still nothing distinguishing came back.
     TimeoutIndistinct,
+    /// **No measurement was made.** The instrument could not run, or could not be trusted,
+    /// so this row says nothing about the TSPU — not even "indistinct". Emitted by the run
+    /// wrapper (never by the classifier: `probe::classify` has an [`Observation`] in hand,
+    /// which means the probe did run). Excluded from every verdict rate; its own rate is an
+    /// instrument-health metric. Added in contract 0.2.
+    NotEvaluated {
+        reason: NotEvaluatedReason,
+        /// Operator-facing diagnostic (the probe's stderr tail, a path, an errno). Free
+        /// text is allowed here precisely because it is *not* part of the taxonomy: nothing
+        /// aggregates on it. Kept short; never a user identifier.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        detail: String,
+    },
+}
+
+/// Why a run produced no measurement. Closed set, same additive-by-minor rule as
+/// [`Verdict`]. Each is something the sensor can establish about *itself* before or after a
+/// run — none of them is a statement about the far end, because from the RU side a dead echo
+/// server and a total block are the same silence (see CONTRACT.md Part 1, `not-evaluated`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotEvaluatedReason {
+    /// The probe binary is missing or not executable.
+    ProbeMissing,
+    /// The sensor config could not be read, or lacks a required field (`SERVER`, a
+    /// well-formed `LOK_PROBE_KEY`).
+    ConfigInvalid,
+    /// The run lacked `CAP_NET_RAW`, so the capture that distinguishes an injected RST from a
+    /// blackout could not exist — every RST-based block would have landed in
+    /// `timeout_indistinct` as a false null.
+    NoCapability,
+    /// The probe exited non-zero before producing a verdict (bind failure, unresolvable
+    /// address, panic). Its stderr is in `detail`.
+    ProbeError,
+    /// The probe produced output that is not a verdict this contract knows.
+    MalformedVerdict,
+}
+
+impl Verdict {
+    /// `false` only for [`Verdict::NotEvaluated`]. Rates, comparisons between sensors, and
+    /// anything that reads "what did the TSPU do" must filter on this first; otherwise a
+    /// week with a dead sensor is a week of 100 % `timeout_indistinct`-shaped nothing.
+    pub fn is_measurement(&self) -> bool {
+        !matches!(self, Verdict::NotEvaluated { .. })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +362,47 @@ mod tests {
             serde_json::to_string(&Verdict::Ok).unwrap(),
             r#"{"kind":"ok"}"#
         );
+    }
+
+    /// The run wrapper (`deploy/run-battery.sh`) writes `not_evaluated` rows by hand, in
+    /// bash, so the exact strings it emits are pinned here: if this shape drifts the wrapper
+    /// and the contract disagree and the row becomes `malformed` at best.
+    #[test]
+    fn not_evaluated_json_shape_matches_the_wrapper() {
+        let v = Verdict::NotEvaluated {
+            reason: NotEvaluatedReason::NoCapability,
+            detail: "CapEff lacks CAP_NET_RAW".into(),
+        };
+        assert_eq!(
+            serde_json::to_string(&v).unwrap(),
+            r#"{"kind":"not_evaluated","reason":"no_capability","detail":"CapEff lacks CAP_NET_RAW"}"#
+        );
+        // `detail` is optional on the wire.
+        let bare: Verdict =
+            serde_json::from_str(r#"{"kind":"not_evaluated","reason":"probe_missing"}"#).unwrap();
+        assert_eq!(bare, Verdict::NotEvaluated { reason: NotEvaluatedReason::ProbeMissing, detail: String::new() });
+        // Every reason the wrapper can emit round-trips.
+        for r in ["probe_missing", "config_invalid", "no_capability", "probe_error", "malformed_verdict"] {
+            let s = format!(r#"{{"kind":"not_evaluated","reason":"{r}"}}"#);
+            let v: Verdict = serde_json::from_str(&s).unwrap_or_else(|e| panic!("{r}: {e}"));
+            assert!(!v.is_measurement());
+        }
+    }
+
+    #[test]
+    fn every_real_verdict_is_a_measurement() {
+        for v in [
+            Verdict::Ok,
+            Verdict::InjectedRstAtSni,
+            Verdict::SilentDropFromSegment { n: 0 },
+            Verdict::ThrottleToRate { bps: 1 },
+            Verdict::UdpClassDrop,
+            Verdict::ActiveProbeObserved,
+            Verdict::PayloadMutated,
+            Verdict::TimeoutIndistinct,
+        ] {
+            assert!(v.is_measurement(), "{v:?}");
+        }
     }
 
     #[test]

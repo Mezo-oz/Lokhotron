@@ -109,7 +109,8 @@ the deliberate price of not being a reflector. A mismatched key is indistinguish
 block, so `deploy/sensor-setup.sh` ends in a pre-flight run and refuses to enable the timer unless
 it comes back `ok` (`LOK_FORCE_ENABLE=1` to override). IPv4 only in the capture path (`peer_v4`
 returns `None` on v6 and the battery falls back to the default control TTL). Mutation *leg* is
-reported to the operator on stderr but has nowhere to go in the contract yet — promote it when the
+reported to the operator on stderr — `run-battery.sh` now keeps it beside the row (`"stderr"`
+field) instead of discarding it — but it has no home in the contract yet; promote it when the
 collector exists. `WeightedBundle::verify_stub` is a placeholder (real ed25519 with the control
 plane, Phase 2). This is all still **lab** ground-truth — the next real milestone is a live
 RU/non-RU VPS pair.
@@ -215,8 +216,10 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
   telegram 45k, tor 45k, torsf 1.2k, riseupvpn 322 over 30 days; `vanilla_tor` unusable, ~95%
   failures). Censored Planet shapes still unverified — not needed for the gap read.
 - Concrete transport enum must track amnezia-client's real transport set, not the draft guess.
-- **Verdict vocabulary ↔ dpi-bench property vocabulary** — reconcile once dpi-bench firms up
-  (one-way pull into CONTRACT Part 1; not a blocker; dpi-bench is a separate session).
+- **Verdict vocabulary ↔ dpi-bench property vocabulary** — first pull done 2026-09-04: dpi-bench's
+  third state (`exit 2`, "cannot judge") became `not_evaluated` (contract 0.2). Its byte-level
+  properties were checked and don't transfer (they describe zapret2's dissector, not the TSPU).
+  Further pulls stay one-way and non-blocking; dpi-bench is a separate session.
 - Name invariant: "Lokhotron"/лохотрон never appears in any client-facing artifact or contract
   payload that reaches the client. Safe only because the trust boundary keeps it censor-facing.
 
@@ -261,9 +264,15 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
 4. **Run the battery live for a week, and watch the `timeout_indistinct` rate.** The instrument is
    calibrated 8/8 against kernel-injected faults, so a blank is now a *finding* ("the TSPU is
    uniform at this granularity") rather than "our tool is blind" — that two-sided honesty is what
-   the calibration bought. Compare the three sensors against each other: divergence between
-   providers is itself the Correction 3 result, measured on our own instrument instead of inferred
-   from OONI.
+   the calibration bought. It holds only for rows that are measurements: `run-battery.sh` records a
+   sensor that could not run (binary, config, `CAP_NET_RAW`, probe crash/timeout, echo host refusing)
+   as `not_evaluated`, never as `timeout_indistinct`, and re-checks on every tick rather than once
+   at install. Exclude those rows from every rate and watch their count as sensor health — a wall of
+   them is a dead box, not a uniform TSPU. The one silence the sensor cannot classify is "echo
+   server down vs. wrong key vs. real total block": settle that from the server's journal and from
+   whether all three sensors went quiet at the same instant. Compare the three sensors against
+   each other: divergence between providers is itself the Correction 3 result, measured on our
+   own instrument instead of inferred from OONI.
 
 5. **Fold the results back.** A draft write-up already exists at
    [writeups/net4people-2026-08-draft.md](writeups/net4people-2026-08-draft.md) — it covers the
@@ -281,6 +290,11 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
    replace `WeightedBundle::verify_stub` with real ed25519.
 
 ### Recently closed
+
+- **Infrastructure failure is no longer a censorship finding** (2026-09-04) — `Verdict::NotEvaluated`
+  (contract 0.2, closed `reason` set) and a per-run liveness gate in `deploy/run-battery.sh`; the
+  probe's stderr is kept beside the row instead of thrown away. Every branch exercised against the
+  real probe + echo server. The dpi-bench inheritance that did transfer.
 
 - **The keyed echo protocol** (2026-08-29) — the two shapes that made the instrument report
   something *false* rather than nothing: a rewritten header read as a drop, and a reflector read as

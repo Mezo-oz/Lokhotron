@@ -118,6 +118,19 @@ Each line is one tagged verdict:
 {"ts":"2026-08-26T18:00:00Z","asn":12389,"region":"ru-nw","verdict":{"kind":"ok"}}
 ```
 
+Two things to know about those lines before you read a week of them:
+
+- **`{"kind":"not_evaluated","reason":…,"detail":…}` is not a finding.** It means the run wrapper
+  found the *instrument* unfit before or during the run — binary gone, config unreadable or
+  unkeyed, no `CAP_NET_RAW`, probe crashed or timed out, or the echo *host* answered "nothing
+  listening" — and refused to write a verdict about the TSPU. Every other kind, `timeout_indistinct`
+  included, means the probe ran and is describing the path. Exclude `not_evaluated` rows from every
+  rate; count them separately as sensor health (`grep -c not_evaluated`, and the unit shows in
+  `systemctl --failed`). A wall of them is a box problem, fix the box. Contract 0.2 (CONTRACT.md).
+- **An optional `"stderr"` field** rides next to the verdict when the probe said anything on its
+  operator channel — the echo-integrity line (which leg was mutated, reflected/unauthenticated
+  counts, keyed vs open mode) or a warning. It is context for you, not part of the verdict.
+
 The timer runs the battery every `interval` seconds with ±120 s jitter. **Gentleness is a safety
 parameter** — a tight, regular cadence of odd probes is itself flaggable. Keep the interval loose.
 

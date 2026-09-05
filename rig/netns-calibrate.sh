@@ -67,7 +67,7 @@ run_case() {
     out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
     kill "$srv" 2>/dev/null || true
     echo "  probe -> $out"
-    if echo "$out" | grep -q "\"kind\":\"$expect\""; then
+    if grep -q "\"kind\":\"$expect\"" <<< "$out"; then
         echo "  PASS"
     else
         echo "  FAIL (wanted kind=$expect)"; return 1
@@ -93,7 +93,7 @@ main() {
     kill "$srv" 2>/dev/null || true
     ip netns exec "$NS_B" tc qdisc del dev "$VETH_B" root 2>/dev/null || true
     echo "  probe -> $out"
-    echo "$out" | grep -q '"kind":"throttle_to_rate"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
+    grep -q '"kind":"throttle_to_rate"' <<< "$out" && echo "  PASS" || { echo "  FAIL"; exit 1; }
 
     # Injected RST: no TCP listener on the server side, so a connect is refused with a RST;
     # mangle that RST's TTL to 200 (distinct from the 1-hop path's ~64) so is_ttl_anomalous()
@@ -115,7 +115,7 @@ NFT
     kill "$srv" 2>/dev/null || true
     ip netns exec "$NS_B" nft delete table ip lok 2>/dev/null || true
     echo "  probe -> $out"
-    echo "$out" | grep -q '"kind":"injected_rst_at_sni"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
+    grep -q '"kind":"injected_rst_at_sni"' <<< "$out" && echo "  PASS" || { echo "  FAIL"; exit 1; }
 
     # Payload mutated in flight: nftables rewrites one byte of the echo's known payload on
     # the server's egress (and fixes the UDP checksum itself, exactly as a real middlebox
@@ -139,7 +139,7 @@ NFT
     kill "$srv" 2>/dev/null || true
     ip netns exec "$NS_B" nft delete table ip lokmut 2>/dev/null || true
     echo "  probe -> $out"
-    echo "$out" | grep -q '"kind":"payload_mutated"' && echo "  PASS" || { echo "  FAIL"; exit 1; }
+    grep -q '"kind":"payload_mutated"' <<< "$out" && echo "  PASS" || { echo "  FAIL"; exit 1; }
 
     # Negative case — the shared-vantage false positive. A second flow to a closed port on the
     # same server answers with RSTs whose TTL is mangled to 200, i.e. RSTs that WOULD read as
@@ -167,7 +167,7 @@ NFT
     kill "$srv" 2>/dev/null || true
     ip netns exec "$NS_B" nft delete table ip lokrst 2>/dev/null || true
     echo "  probe -> $out"
-    echo "$out" | grep -q '"kind":"ok"' && echo "  PASS" || { echo "  FAIL (a foreign flow's RST leaked into the verdict)"; exit 1; }
+    grep -q '"kind":"ok"' <<< "$out" && echo "  PASS" || { echo "  FAIL (a foreign flow's RST leaked into the verdict)"; exit 1; }
 
     # The probe's OWN header rewritten in flight. @th,96,8 = UDP payload byte 4 = the high
     # byte of the marker. Before the keyed format this made the echo unrecognizable and the
@@ -189,7 +189,7 @@ NFT
     kill "$srv" 2>/dev/null || true
     ip netns exec "$NS_B" nft delete table ip lokhdr 2>/dev/null || true
     echo "  probe -> $out"
-    if echo "$out" | grep -q '"kind":"payload_mutated"'; then
+    if grep -q '"kind":"payload_mutated"' <<< "$out"; then
         echo "  PASS"
     else
         echo "  FAIL (a rewritten header must not be reported as a drop)"; exit 1
@@ -206,7 +206,7 @@ NFT
     out=$(ip netns exec "$NS_A" ./target/debug/probe "$IP_B:$PORT" 8 || true)
     kill "$srv" 2>/dev/null || true
     echo "  probe -> $out"
-    if echo "$out" | grep -q '"kind":"udp_class_drop"'; then
+    if grep -q '"kind":"udp_class_drop"' <<< "$out"; then
         echo "  PASS"
     else
         echo "  FAIL (a reflected request was scored as delivery)"; exit 1
