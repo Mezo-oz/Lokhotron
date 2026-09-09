@@ -251,8 +251,10 @@ The fix isn't dpi-bench — it's applying dpi-bench's discipline to Lokhotron's 
                                      |______ opt-in client outcomes reported back _|
 ```
 
-1. **Sensors (Android, in RU).** Probe battery: AmneziaWG, VLESS+Reality, Shadowsocks-2022,
-   obfs4, plain-TLS control → known endpoints. Record verdict-vocabulary outcome + metrics, tag
+1. **Sensors (Android, in RU).** Probe battery: AmneziaWG, XRay/VLESS+REALITY, Shadowsocks,
+   OpenVPN-over-Cloak, and three positive controls the DPI should find easy (WireGuard, OpenVPN,
+   IKEv2) plus a plain-TLS control → known endpoints. See CONTRACT.md's transport table; the set
+   tracks amnezia-client's real containers, reconciled 2026-09-09. Record verdict-vocabulary outcome + metrics, tag
    {ASN, region, timestamp}. **Gentle** — spread out, low-rate, cover-consistent, opt-in (a
    20-connection burst to odd endpoints is itself flaggable in 2026).
 2. **Reverse-measurement servers (non-RU).** The other end of the delta. Raw capture below the

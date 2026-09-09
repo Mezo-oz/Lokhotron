@@ -47,7 +47,7 @@ fn drop_after_four_is_silent_drop_from_segment() {
 
 #[test]
 fn nothing_arrives_from_the_start_is_drop_from_zero() {
-    let mut obs = Observation::baseline(Transport::Reality, 8);
+    let mut obs = Observation::baseline(Transport::XrayReality, 8);
     obs.highest_marker_arrived = None;
     obs.handshake_ok = false;
     obs.tcp_reachable = true; // path up, but this TCP transport delivered nothing
@@ -65,14 +65,14 @@ fn udp_silent_with_tcp_up_is_udp_class_drop() {
 
 #[test]
 fn anomalous_rst_ttl_is_injected_rst() {
-    let mut obs = Observation::baseline(Transport::Reality, 8);
+    let mut obs = Observation::baseline(Transport::XrayReality, 8);
     obs.rst = Some(RstInfo { ttl: 200, ip_id: 0, ttl_anomaly: true });
     assert_eq!(classify(&obs), Verdict::InjectedRstAtSni);
 }
 
 #[test]
 fn mutated_payload_is_payload_mutated() {
-    let mut obs = Observation::baseline(Transport::Ss2022, 8);
+    let mut obs = Observation::baseline(Transport::Shadowsocks, 8);
     obs.payload_hash_mismatch = true;
     assert_eq!(classify(&obs), Verdict::PayloadMutated);
 }
@@ -89,7 +89,7 @@ fn mutated_header_is_payload_mutated_not_a_drop() {
 
 #[test]
 fn slow_transfer_is_throttled() {
-    let mut obs = Observation::baseline(Transport::Ss2022, 8);
+    let mut obs = Observation::baseline(Transport::Shadowsocks, 8);
     obs.throughput_bps = Some(120_000);
     obs.expected_bps = Some(10_000_000);
     assert_eq!(classify(&obs), Verdict::ThrottleToRate { bps: 120_000 });
@@ -97,7 +97,7 @@ fn slow_transfer_is_throttled() {
 
 #[test]
 fn forwarded_reality_probe_is_active_probe_observed() {
-    let mut obs = Observation::baseline(Transport::Reality, 8);
+    let mut obs = Observation::baseline(Transport::XrayReality, 8);
     obs.active_probe_forwarded = true;
     assert_eq!(classify(&obs), Verdict::ActiveProbeObserved);
 }

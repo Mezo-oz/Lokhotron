@@ -1,7 +1,8 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-09-01 (re-ran both pre-spend screens — runbook
+> or an open question closes. Last updated: 2026-09-09 (transport enum reconciled against
+> amnezia-client; see the closed open-question below). Prior: 2026-09-01 (re-ran both pre-spend screens — runbook
 > step 1 — before renting: OFAC gate unchanged since 2026-08-27, Aeza still SDN-designated and the
 > control case still fires, MTW/Timeweb/Beget still clear; OONI path profiles still Beget near-clean
 > / Timeweb protocol-selective / MTW consumer-like, Correction-3 sign-flip intact. Prior: 2026-08-29
@@ -20,8 +21,8 @@ differential technique.
 ## Repo
 
 `github.com/Mezo-oz/Lokhotron` — public, MIT. Design settled; **Phase 1 scaffold + TCP increment
-built and verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **49
-tests pass** (16 lok-wire + 2 lok-contract + 9 lok-capture + 22 calibration incl. real loopback
+built and verified** (WSL cargo 1.98): `cargo build --workspace` + `cargo clippy` clean, **53
+tests pass** (16 lok-wire + 6 lok-contract + 9 lok-capture + 22 calibration incl. real loopback
 end-to-end).
 
 Run the suite with **`sudo rig/netns-test.sh`**, which runs it inside a private network namespace.
@@ -215,7 +216,20 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
   (`api.ooni.io/api/v1/aggregation`, `axis_x=probe_asn`, live and well-populated: psiphon 79k,
   telegram 45k, tor 45k, torsf 1.2k, riseupvpn 322 over 30 days; `vanilla_tor` unusable, ~95%
   failures). Censored Planet shapes still unverified — not needed for the gap read.
-- Concrete transport enum must track amnezia-client's real transport set, not the draft guess.
+- ~~Concrete transport enum must track amnezia-client's real transport set~~ — **done
+  2026-09-09**, read from amnezia-client `dev` (`containerEnum.h`, `protocolEnum.h`,
+  `containerUtils.cpp`, `protocolConstants.h`). The draft guess named two transports the client
+  cannot speak: `ss2022` (Amnezia's Shadowsocks cipher is `chacha20-ietf-poly1305`; no
+  `2022-blake3-*` exists in the tree) and `obfs4` (Tor's, not Amnezia's — their OpenVPN
+  obfuscation is Cloak). It also treated REALITY as a transport when it is one of three security
+  modes on the XRay container, and amnezia-client refuses to pair it with mKCP. New set is nine
+  entries, tabled in CONTRACT.md; added WireGuard, OpenVPN and IKEv2 as *positive* controls, all
+  three DPI-obvious by Amnezia's own description. **The axis is wire fingerprint, not container
+  inventory** — `Awg2` is a separate container mapping to the same `Proto::Awg`, so it needs no
+  variant. Also fixed an interop bug found on the way: CONTRACT.md published `amneziawg` /
+  `plain-tls-control` while `rename_all = "snake_case"` emitted `amnezia_wg` /
+  `plain_tls_control`, and nothing compared them. Wire names are now pinned per variant with a
+  test that fails on exactly that mismatch (verified against the old spelling).
 - **Verdict vocabulary ↔ dpi-bench property vocabulary** — first pull done 2026-09-04: dpi-bench's
   third state (`exit 2`, "cannot judge") became `not_evaluated` (contract 0.2). Its byte-level
   properties were checked and don't transfer (they describe zapret2's dissector, not the TSPU).

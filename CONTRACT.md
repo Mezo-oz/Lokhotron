@@ -105,7 +105,7 @@ Conceptual record (pre-aggregation, never transmitted raw from a client):
   contract_version:  "0.2",
   asn:               uint32,          // operator ASN — coarse, no sub-prefix
   region:            string,          // coarse region code, not city/GPS
-  transport:         enum,            // amneziawg | vless-reality | ss2022 | obfs4 | plain-tls-control
+  transport:         enum,            // see the transport table below
   endpoint_class:    enum,            // which endpoint COHORT, never a specific endpoint id
   verdict:           enum,            // from Part 1
   metrics:           { rtt_ms?, rate_bps?, rst_ttl?, highest_marker?, ... },
@@ -113,6 +113,37 @@ Conceptual record (pre-aggregation, never transmitted raw from a client):
   sensor_class:      enum             // residential | vps | dark  (weights differ; see DESIGN)
 }
 ```
+
+### `transport` — the probe battery
+
+Reconciled against amnezia-client `dev` on 2026-09-09. The wire name is normative; tree #2
+implements from this column, so it is pinned per variant in `lok-contract` rather than derived
+from the Rust identifier.
+
+| wire name | amnezia-client | rides |
+|---|---|---|
+| `plain-tls-control` | — (Lokhotron's own control) | TCP |
+| `wireguard` | `DockerContainer::WireGuard`, "WireGuard" | UDP |
+| `amneziawg` | `DockerContainer::Awg` **and** `Awg2` — both `Proto::Awg` | UDP |
+| `openvpn` | `DockerContainer::OpenVpn`, "OpenVPN" | UDP |
+| `openvpn-over-cloak` | `DockerContainer::Cloak`, "OpenVPN over Cloak" | TCP |
+| `xray-reality` | `DockerContainer::Xray` with `security=reality` | TCP |
+| `shadowsocks` | `DockerContainer::SSXray`, "Shadowsocks" (AEAD `chacha20-ietf-poly1305`) | TCP |
+| `ikev2` | `DockerContainer::Ipsec`, `Proto::Ikev2` | UDP |
+| `synthetic-control` | — (Lokhotron's own control) | UDP |
+
+**The axis is wire fingerprint, not amnezia-client's container inventory.** `Awg2` is a separate
+container with its own installer and maps to the same `Proto::Awg`; one entry covers both. Add a
+row when the TSPU could tell two things apart, not when Amnezia ships a container.
+
+`wireguard`, `openvpn` and `ikev2` are *positive* controls: all three are cheap for a DPI to
+recognise — amnezia-client's own copy says WireGuard is "easily identifiable by DPI systems due
+to its distinctive packet signatures" — so a path that leaves them alone has said something as
+definite as one that blocks them.
+
+`rides` gates `Verdict::udp-class-drop`, which may only be reached from a UDP row. Calling a
+class-level UDP drop on a TCP transport is a fabricated finding of exactly the kind the
+calibration rig exists to catch.
 
 Hard rules:
 - **No user identifier, ever.** No device id, no install id, no precise timestamp, no GPS, no
@@ -174,8 +205,14 @@ Least-disclosure rules (this artifact reaches adversary hands):
 
 ## Open before v1.0 (don't trust from memory — verify at build time)
 
-- The concrete transport enum will change as the client's supported transports settle — keep it in
-  lockstep with amnezia-client's actual transport set, not this draft's guess.
+- ~~The concrete transport enum~~ — **reconciled 2026-09-09** against amnezia-client `dev`
+  (`containerEnum.h`, `protocolEnum.h`, `containerUtils.cpp`, `protocolConstants.h`). The draft
+  guess named two transports the client cannot speak (`ss2022` — Amnezia's Shadowsocks cipher is
+  `chacha20-ietf-poly1305`, and no `2022-blake3-*` exists in the tree; `obfs4` — that is Tor's,
+  Amnezia uses Cloak) and treated REALITY as a transport when it is one of three security modes on
+  the XRay container. Current set is the table above. Re-check when amnezia-client adds a container:
+  add a variant only if the TSPU could tell it apart from an existing one — `Awg2` is a separate
+  container that maps to `Proto::Awg` and needs no variant.
 - k threshold value and the exact edge-aggregation mechanism (simple count vs. a real private
   aggregation scheme) need a threat-model pass before residential clients report anything.
 - Signature scheme / key format should reuse whatever amnezia-client's config-update path already

@@ -106,26 +106,91 @@ impl Verdict {
 // Transports
 // ---------------------------------------------------------------------------
 
-/// The probe battery's transports. The concrete set must track amnezia-client's real
-/// transport set (see CONTRACT.md open questions), not this draft.
+/// The probe battery's transports.
+///
+/// Reconciled against amnezia-client `dev` on 2026-09-09 (`client/core/utils/containerEnum.h`,
+/// `client/core/utils/protocolEnum.h`, `client/core/utils/containers/containerUtils.cpp`,
+/// `client/core/utils/constants/protocolConstants.h`). Three corrections to the earlier draft,
+/// each worth keeping written down because the draft was wrong in a way that reads plausible:
+///
+/// * There is no Shadowsocks-2022 in Amnezia. `shadowsocks::defaultCipher` is
+///   `chacha20-ietf-poly1305` — AEAD, not 2022 — and no `2022-blake3-*` appears anywhere in
+///   the tree. The old `Ss2022` named a transport the client cannot speak.
+/// * There is no obfs4 either; that is Tor's pluggable transport. Amnezia's OpenVPN
+///   obfuscation is Cloak, which is what [`Transport::OpenVpnOverCloak`] replaces it with.
+/// * REALITY is not a transport but one of three security modes on the XRay container
+///   (`none` / `tls` / `reality`), and amnezia-client refuses to pair it with the mKCP
+///   transport. [`Transport::XrayReality`] names the mode as well as the container because
+///   the mode is the part the TSPU sees.
+///
+/// **This enum tracks wire fingerprints, not amnezia-client's container inventory.** The
+/// proof case is `Awg2`: it is a separate `DockerContainer` with its own installer, but
+/// `containerUtils.cpp` maps it to `Proto::Awg`, the same protocol on the wire. One variant
+/// covers both. Add a variant when the TSPU could tell two things apart, not when Amnezia
+/// ships a new container.
+///
+/// Serialized names are pinned per variant rather than derived. A `rename_all` here silently
+/// disagreed with the names CONTRACT.md publishes — the spec said `amneziawg`, the code
+/// emitted `amnezia_wg` — and tree #2 implements from the spec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum Transport {
     /// Benign TLS to a real SNI — the "is the path up at all" control.
+    #[serde(rename = "plain-tls-control")]
     PlainTlsControl,
-    Reality,
+
+    /// Stock WireGuard (`DockerContainer::WireGuard`). A *positive* control: amnezia-client's
+    /// own description calls it "easily identifiable by DPI systems due to its distinctive
+    /// packet signatures". A path that does not block it has told us something sharp.
+    #[serde(rename = "wireguard")]
+    WireGuard,
+
+    /// AmneziaWG (`DockerContainer::Awg` and `Awg2`, both `Proto::Awg`).
+    #[serde(rename = "amneziawg")]
     AmneziaWg,
-    Ss2022,
-    Obfs4,
+
+    /// Stock OpenVPN (`DockerContainer::OpenVpn`), UDP by default
+    /// (`openvpn::defaultTransportProto`). The TCP-side positive control.
+    #[serde(rename = "openvpn")]
+    OpenVpn,
+
+    /// OpenVPN inside Cloak (`DockerContainer::Cloak`, "OpenVPN over Cloak") — TLS mimicry
+    /// with active-probing resistance. Amnezia's actual answer to obfs4.
+    #[serde(rename = "openvpn-over-cloak")]
+    OpenVpnOverCloak,
+
+    /// XRay/VLESS with `security=reality` (`DockerContainer::Xray`).
+    #[serde(rename = "xray-reality")]
+    XrayReality,
+
+    /// Shadowsocks AEAD (`DockerContainer::SSXray`, displayed "Shadowsocks").
+    #[serde(rename = "shadowsocks")]
+    Shadowsocks,
+
+    /// IKEv2/IPsec (`DockerContainer::Ipsec`, `Proto::Ikev2`). Fixed UDP 500/4500, so it is
+    /// cheap to block and cheap to measure — another positive control.
+    #[serde(rename = "ikev2")]
+    Ipsec,
+
     /// Openly-synthetic, fully-labeled baseline (allowed a probe header; never dressed
     /// as a real transport, so its fingerprint doesn't matter).
+    #[serde(rename = "synthetic-control")]
     SyntheticControl,
 }
 
 impl Transport {
-    /// Whether this transport rides UDP. Only AmneziaWG in the current battery.
+    /// Whether this transport rides UDP.
+    ///
+    /// This gates [`Verdict::UdpClassDrop`]: a UDP transport that went silent while TCP stayed
+    /// up is a class-level drop, and calling that on a TCP transport would be a fabricated
+    /// finding. OpenVPN is listed here because Amnezia ships it UDP-first
+    /// (`openvpn::defaultTransportProto` is `"udp"`); a TCP-configured OpenVPN probe would
+    /// need its own variant rather than a runtime flag, since the two look different on the
+    /// wire and that is what this enum is for.
     pub fn is_udp(self) -> bool {
-        matches!(self, Transport::AmneziaWg)
+        matches!(
+            self,
+            Transport::WireGuard | Transport::AmneziaWg | Transport::OpenVpn | Transport::Ipsec
+        )
     }
 }
 
@@ -413,17 +478,70 @@ mod tests {
             ttl_buckets: 6,
             scope: Scope { asn: 12389, region: "ru-nw".into() },
             mix: vec![
-                BundleEntry { transport: Transport::Reality, endpoint_class: "a".into(), weight: 0.7, min_floor: Some(0.1) },
+                BundleEntry { transport: Transport::XrayReality, endpoint_class: "a".into(), weight: 0.7, min_floor: Some(0.1) },
                 BundleEntry { transport: Transport::AmneziaWg, endpoint_class: "b".into(), weight: 0.3, min_floor: None },
             ],
             signature: vec![],
         };
         assert!(bundle.verify_stub(b"pk"));
-        assert_eq!(bundle.sample(0.0).unwrap().transport, Transport::Reality);
+        assert_eq!(bundle.sample(0.0).unwrap().transport, Transport::XrayReality);
         assert_eq!(bundle.sample(0.99).unwrap().transport, Transport::AmneziaWg);
         // empty mix -> None
         let mut empty = bundle.clone();
         empty.mix.clear();
         assert!(empty.sample(0.5).is_none());
+    }
+
+    /// The transport wire names are the contract with tree #2, which implements from
+    /// CONTRACT.md rather than from this crate. Pin them.
+    ///
+    /// This test exists because the names silently disagreed for the whole of v0.2: the spec
+    /// published `amneziawg` and `plain-tls-control` while a `rename_all = "snake_case"` here
+    /// emitted `amnezia_wg` and `plain_tls_control`. Nothing caught it, because nothing
+    /// asserted the serialized form -- the Rust identifiers were fine and the doc was fine,
+    /// and they were never compared. Changing a variant's spelling is a breaking change to
+    /// the wire format; if this test fails, the version needs to move, not the assertion.
+    #[test]
+    fn transport_wire_names_match_the_contract() {
+        let expected = [
+            (Transport::PlainTlsControl, "plain-tls-control"),
+            (Transport::WireGuard, "wireguard"),
+            (Transport::AmneziaWg, "amneziawg"),
+            (Transport::OpenVpn, "openvpn"),
+            (Transport::OpenVpnOverCloak, "openvpn-over-cloak"),
+            (Transport::XrayReality, "xray-reality"),
+            (Transport::Shadowsocks, "shadowsocks"),
+            (Transport::Ipsec, "ikev2"),
+            (Transport::SyntheticControl, "synthetic-control"),
+        ];
+        for (t, name) in expected {
+            let json = serde_json::to_string(&t).expect("serialize");
+            assert_eq!(json, format!("\"{name}\""), "{t:?} serialized wrong");
+            let back: Transport = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(back, t, "{name} did not round-trip");
+        }
+    }
+
+    /// `udp-class-drop` may only be reached from a UDP transport, so which transports are UDP
+    /// is a correctness property, not a detail. Reaching it from a TCP row would be a
+    /// fabricated finding of the kind the calibration rig exists to prevent.
+    #[test]
+    fn udp_transports_are_exactly_the_datagram_ones() {
+        for t in [
+            Transport::WireGuard,
+            Transport::AmneziaWg,
+            Transport::OpenVpn,
+            Transport::Ipsec,
+        ] {
+            assert!(t.is_udp(), "{t:?} should ride UDP");
+        }
+        for t in [
+            Transport::PlainTlsControl,
+            Transport::OpenVpnOverCloak,
+            Transport::XrayReality,
+            Transport::Shadowsocks,
+        ] {
+            assert!(!t.is_udp(), "{t:?} should not ride UDP");
+        }
     }
 }
