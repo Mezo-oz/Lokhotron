@@ -12,6 +12,7 @@ members = [
 ]
 
 [workspace.package]
+authors = ["Mezo-oz"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/Mezo-oz/Lokhotron"
