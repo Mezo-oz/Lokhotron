@@ -59,6 +59,9 @@ STOPWORDS = {
     # Legal-form suffixes. These identify a jurisdiction's company law, not a company.
     "s.l.", "b.v.", "s.r.o.", "a.s.", "s.a.", "n.v.", "sarl", "fzco", "dmcc", "oao", "zao",
     "pjsc", "ojsc", "cjsc", "gmbh.", "l.l.c", "l.l.c.", "spa", "pte", "pty", "kft",
+    # Lithuanian/Latvian/Estonian legal forms. "uab" matched UAB FLAVOUR LABS against
+    # Melbikomas UAB -- the same shape as the earlier s.l. and b.v. false positives.
+    "uab", "ab", "sia", "oü", "ou",
 }
 
 

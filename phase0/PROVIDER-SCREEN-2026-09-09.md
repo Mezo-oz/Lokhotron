@@ -30,6 +30,8 @@ OFAC screen: 40,031 entries across SDN, SDN alternate-names and the consolidated
 | DDoS-Guard | RU | AS57724 | **22 ENTITY HIT(S) — review** | cleared by hand | _none_ |
 | StormWall | CZ | AS59796 | no match | — | _none_ |
 | G-Core | LU | AS199524 | **8 ENTITY HIT(S) — review** | cleared by hand | _none_ |
+| EDIS | EU | AS57169 | no match | cleared by hand | `psiphon` 17.6% (n=34) |
+| Melbicom | LT | AS56630 | no match | cleared by hand | _none_ |
 
 ## OFAC matches, for human review
 
@@ -133,3 +135,4 @@ Recorded human review verdicts live in `providers.json` (`screen_review`), so a 
 | FirstByte | `tor` | 1878 | **87.1%** | 85.5%–88.5% | AS205090 (n=1878) |
 | FirstByte | `psiphon` | 1877 | **1.2%** | 0.8%–1.8% | AS205090 (n=1877) |
 | FirstByte | `telegram` | 1845 | **93.9%** | 92.7%–94.9% | AS205090 (n=1845) |
+| EDIS | `psiphon` | 34 | **17.6%** | 8.3%–33.5% | AS57169 (n=34) |

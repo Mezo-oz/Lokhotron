@@ -1,284 +1,308 @@
 {
-  "_doc": [
-    "Candidate RU VPS/hosting providers for the Phase 1 sensor, with ASNs resolved from",
-    "RIPEstat searchcomplete (holder names recorded verbatim so a wrong match is visible).",
-    "Re-resolve with: python phase0/provider_screen.py --refresh-asns",
-    "",
-    "Inclusion here means 'a provider you might plausibly rent from', NOT 'approved'. The",
-    "screen is what produces a recommendation, and a sanctions hit ends the conversation.",
-    "Aeza is deliberately included: it is OFAC-designated, so it is the control case that",
-    "proves the sanctions screen actually fires."
-  ],
-  "providers": [
-    {
-      "name": "Selectel",
-      "country": "RU",
-      "asns": [
-        49505,
-        50340,
-        61976,
-        198652
-      ],
-      "holders": [
-        "SELECTEL JSC Selectel",
-        "SELECTEL-MSK JSC Selectel",
-        "SELECTEL-NSK JSC Selectel",
-        "SELECTEL-AS Selectel LTD"
-      ],
-      "screen_review": "Earlier hit was 'msk' from the AS handle SELECTEL-MSK, not a company name; handles are now stripped. No designation found. Reviewed 2026-08-27."
-    },
-    {
-      "name": "Timeweb",
-      "country": "RU",
-      "asns": [
-        9123,
-        51789
-      ],
-      "holders": [
-        "TimeWeb-AS JSC \"TIMEWEB\"",
-        "TimewebCloud JSC \"TIMEWEB\""
-      ]
-    },
-    {
-      "name": "Beget",
-      "country": "RU",
-      "asns": [
-        198610,
-        213533
-      ],
-      "holders": [
-        "BEGET-AS Beget LLC",
-        "BEGET-REGION Beget LLC"
-      ]
-    },
-    {
-      "name": "VDSina",
-      "country": "RU",
-      "asns": [
-        48282,
-        216071
-      ],
-      "holders": [
-        "VDSINA-AS Hosting technology LTD",
-        "VDSINA SERVERS TECH FZCO"
-      ],
-      "note": "AS216071 is a UAE (FZCO) entity; only the RU-registered ASN is an RU vantage."
-    },
-    {
-      "name": "Aeza",
-      "country": "RU",
-      "asns": [
-        210644
-      ],
-      "holders": [
-        "AEZA-AS AEZA GROUP LLC"
-      ],
-      "note": "CONTROL CASE: OFAC-designated 2025-07-01. Must come back as a sanctions hit.",
-      "screen_review": "DESIGNATED 2025-07-01 - AEZA GROUP LLC, AEZA INTERNATIONAL LTD, AEZA LOGISTIC LLC all on SDN. Do not transact. Reviewed 2026-08-27."
-    },
-    {
-      "name": "IHOR",
-      "country": "RU",
-      "asns": [
-        199228,
-        209641
-      ],
-      "holders": [
-        "IHOR-AS IHOR HOSTING LTD",
-        "I-SERVERS-EAST IHOR HOSTING LTD"
-      ],
-      "screen_review": "Person-name collisions only: 'Ihor' is a common Ukrainian given name. No entity match. Reviewed 2026-08-27."
-    },
-    {
-      "name": "MTW",
-      "country": "RU",
-      "asns": [
-        48347
-      ],
-      "holders": [
-        "MTW-AS JSC Mediasoft ekspert"
-      ],
-      "screen_review": "False positive: token 'ekspert' from the legal name 'JSC Mediasoft ekspert'; matched entities (RSV-EKSPERT, EMS EKSPERT, CHIP EKSPERT) are unrelated. Reviewed 2026-08-27."
-    },
-    {
-      "name": "Cloud.ru",
-      "country": "RU",
-      "asns": [
-        208677
-      ],
-      "holders": [
-        "CLOUDRU-AS \"Cloud Technologies\" LLC trading as Cloud.ru"
-      ]
-    },
-    {
-      "name": "Sprinthost",
-      "country": "RU",
-      "asns": [
-        35278,
-        200563,
-        201499
-      ],
-      "holders": [
-        "SPRINTHOST SPRINTHOST.RU LLC"
-      ]
-    },
-    {
-      "name": "Fornex",
-      "country": "ES",
-      "asns": [
-        48018,
-        44051,
-        16003,
-        40840
-      ],
-      "holders": [
-        "FORNEX-RU-AS Fornex Hosting S.L.",
-        "FORNEX-AS Fornex Hosting S.L.",
-        "FORNEX-NL-AS Fornex Hosting S.L."
-      ],
-      "note": "Spanish entity with an RU-region ASN (48018); check which ASN a given plan lands in.",
-      "screen_review": "Earlier hit was the Spanish legal suffix 'S.L.'; now stopworded. No designation found. Reviewed 2026-08-27."
-    },
-    {
-      "name": "Majordomo",
-      "country": "RU",
-      "asns": [
-        43362
-      ],
-      "holders": [
-        "MAJORDOMO Hosting Ltd"
-      ]
-    },
-    {
-      "name": "Rusonyx",
-      "country": "RU",
-      "asns": [
-        41535,
-        205952
-      ],
-      "holders": [
-        "RUSONYX-AS LLC \"ASTRA CLOUD\"",
-        "RUSONYX-AERO LLC \"ASTRA CLOUD\""
-      ],
-      "screen_review": "False positive: token 'astra' from 'LLC ASTRA CLOUD'; all matches are DANA ASTRA / ASTRA GROUP, unrelated. Reviewed 2026-08-27."
-    },
-    {
-      "name": "FirstByte",
-      "country": "RU",
-      "asns": [
-        204997,
-        210703,
-        205090
-      ],
-      "holders": [
-        "FIRSTBYTE-AS FIRST SERVER LIMITED",
-        "FIRSTBYTE-AS FIRSTBYTE HOSTING LTD",
-        "FIRST-SERVER-EUROPE FIRST SERVER LIMITED"
-      ],
-      "note": "Same holder (FIRST SERVER LIMITED) as AS205090, the largest DC-side ASN in the gap read - so this is the one candidate with real OONI signal.",
-      "screen_review": "False positive: token 'first' from 'FIRST SERVER LIMITED'; matches are unrelated companies whose names begin with First. Reviewed 2026-08-27."
-    },
-    {
-      "name": "Adman",
-      "country": "RU",
-      "asns": [
-        57494
-      ],
-      "holders": [
-        "ADMAN-AS Adman LLC"
-      ]
-    },
-    {
-      "name": "RU-CENTER",
-      "country": "RU",
-      "asns": [
-        5537,
-        25537,
-        39494,
-        48287
-      ],
-      "holders": [
-        "RU-CENTER-AS JSC \"RU-CENTER\""
-      ]
-    },
-    {
-      "name": "Yandex Cloud",
-      "country": "RU",
-      "asns": [
-        200350,
-        13238
-      ],
-      "holders": [
-        "YandexCloud Yandex.Cloud LLC",
-        "YANDEX YANDEX LLC"
-      ]
-    },
-    {
-      "name": "Xelent / ATOMDATA",
-      "country": "RU",
-      "asns": [
-        199860
-      ],
-      "holders": [
-        "Xelent-AS ATOMDATA JSC"
-      ]
-    },
-    {
-      "name": "DataLine",
-      "country": "RU",
-      "asns": [
-        34570,
-        35297
-      ],
-      "holders": [
-        "DATALINE-34570-AS Dataline LLC",
-        "DATALINE-AS Dataline LLC"
-      ]
-    },
-    {
-      "name": "HOSTKEY",
-      "country": "NL",
-      "asns": [
-        57043
-      ],
-      "holders": [
-        "HOSTKEY-AS HOSTKEY B.V."
-      ],
-      "note": "Dutch entity selling RU-located servers; the legal counterparty is not Russian.",
-      "screen_review": "Earlier hit was the Dutch suffix 'B.V.'; now stopworded. No designation found. Reviewed 2026-08-27."
-    },
-    {
-      "name": "DDoS-Guard",
-      "country": "RU",
-      "asns": [
-        57724
-      ],
-      "holders": [
-        "DDOS-GUARD DDOS-GUARD LTD"
-      ],
-      "screen_review": "False positive: token 'guard'; matches are IRGC entities. Reviewed 2026-08-27. NOTE: reputational//customer-base concerns about this provider are a separate question from sanctions."
-    },
-    {
-      "name": "StormWall",
-      "country": "CZ",
-      "asns": [
-        59796
-      ],
-      "holders": [
-        "STORMWALL-AS StormWall s.r.o."
-      ]
-    },
-    {
-      "name": "G-Core",
-      "country": "LU",
-      "asns": [
-        199524
-      ],
-      "holders": [
-        "GCORE G-Core Labs S.A."
-      ],
-      "note": "Luxembourg entity of Russian origin; included because it is a common suggestion, not because it is an RU vantage.",
-      "screen_review": "False positive on a generic token; no designation found. Luxembourg entity, not an RU vantage anyway. Reviewed 2026-08-27."
-    }
-  ]
+ "_doc": [
+  "Candidate RU VPS/hosting providers for the Phase 1 sensor, with ASNs resolved from",
+  "RIPEstat searchcomplete (holder names recorded verbatim so a wrong match is visible).",
+  "Re-resolve with: python phase0/provider_screen.py --refresh-asns",
+  "",
+  "Inclusion here means 'a provider you might plausibly rent from', NOT 'approved'. The",
+  "screen is what produces a recommendation, and a sanctions hit ends the conversation.",
+  "Aeza is deliberately included: it is OFAC-designated, so it is the control case that",
+  "proves the sanctions screen actually fires."
+ ],
+ "providers": [
+  {
+   "name": "Selectel",
+   "country": "RU",
+   "asns": [
+    49505,
+    50340,
+    61976,
+    198652
+   ],
+   "holders": [
+    "SELECTEL JSC Selectel",
+    "SELECTEL-MSK JSC Selectel",
+    "SELECTEL-NSK JSC Selectel",
+    "SELECTEL-AS Selectel LTD"
+   ],
+   "screen_review": "Earlier hit was 'msk' from the AS handle SELECTEL-MSK, not a company name; handles are now stripped. No designation found. Reviewed 2026-08-27."
+  },
+  {
+   "name": "Timeweb",
+   "country": "RU",
+   "asns": [
+    9123,
+    51789
+   ],
+   "holders": [
+    "TimeWeb-AS JSC \"TIMEWEB\"",
+    "TimewebCloud JSC \"TIMEWEB\""
+   ]
+  },
+  {
+   "name": "Beget",
+   "country": "RU",
+   "asns": [
+    198610,
+    213533
+   ],
+   "holders": [
+    "BEGET-AS Beget LLC",
+    "BEGET-REGION Beget LLC"
+   ]
+  },
+  {
+   "name": "VDSina",
+   "country": "RU",
+   "asns": [
+    48282,
+    216071
+   ],
+   "holders": [
+    "VDSINA-AS Hosting technology LTD",
+    "VDSINA SERVERS TECH FZCO"
+   ],
+   "note": "AS216071 is a UAE (FZCO) entity; only the RU-registered ASN is an RU vantage."
+  },
+  {
+   "name": "Aeza",
+   "country": "RU",
+   "asns": [
+    210644
+   ],
+   "holders": [
+    "AEZA-AS AEZA GROUP LLC"
+   ],
+   "note": "CONTROL CASE: OFAC-designated 2025-07-01. Must come back as a sanctions hit.",
+   "screen_review": "DESIGNATED 2025-07-01 - AEZA GROUP LLC, AEZA INTERNATIONAL LTD, AEZA LOGISTIC LLC all on SDN. Do not transact. Reviewed 2026-08-27."
+  },
+  {
+   "name": "IHOR",
+   "country": "RU",
+   "asns": [
+    199228,
+    209641
+   ],
+   "holders": [
+    "IHOR-AS IHOR HOSTING LTD",
+    "I-SERVERS-EAST IHOR HOSTING LTD"
+   ],
+   "screen_review": "Person-name collisions only: 'Ihor' is a common Ukrainian given name. No entity match. Reviewed 2026-08-27."
+  },
+  {
+   "name": "MTW",
+   "country": "RU",
+   "asns": [
+    48347
+   ],
+   "holders": [
+    "MTW-AS JSC Mediasoft ekspert"
+   ],
+   "screen_review": "False positive: token 'ekspert' from the legal name 'JSC Mediasoft ekspert'; matched entities (RSV-EKSPERT, EMS EKSPERT, CHIP EKSPERT) are unrelated. Reviewed 2026-08-27."
+  },
+  {
+   "name": "Cloud.ru",
+   "country": "RU",
+   "asns": [
+    208677
+   ],
+   "holders": [
+    "CLOUDRU-AS \"Cloud Technologies\" LLC trading as Cloud.ru"
+   ]
+  },
+  {
+   "name": "Sprinthost",
+   "country": "RU",
+   "asns": [
+    35278,
+    200563,
+    201499
+   ],
+   "holders": [
+    "SPRINTHOST SPRINTHOST.RU LLC"
+   ]
+  },
+  {
+   "name": "Fornex",
+   "country": "ES",
+   "asns": [
+    48018,
+    44051,
+    16003,
+    40840
+   ],
+   "holders": [
+    "FORNEX-RU-AS Fornex Hosting S.L.",
+    "FORNEX-AS Fornex Hosting S.L.",
+    "FORNEX-NL-AS Fornex Hosting S.L."
+   ],
+   "note": "Spanish entity with an RU-region ASN (48018); check which ASN a given plan lands in.",
+   "screen_review": "Earlier hit was the Spanish legal suffix 'S.L.'; now stopworded. No designation found. Reviewed 2026-08-27."
+  },
+  {
+   "name": "Majordomo",
+   "country": "RU",
+   "asns": [
+    43362
+   ],
+   "holders": [
+    "MAJORDOMO Hosting Ltd"
+   ]
+  },
+  {
+   "name": "Rusonyx",
+   "country": "RU",
+   "asns": [
+    41535,
+    205952
+   ],
+   "holders": [
+    "RUSONYX-AS LLC \"ASTRA CLOUD\"",
+    "RUSONYX-AERO LLC \"ASTRA CLOUD\""
+   ],
+   "screen_review": "False positive: token 'astra' from 'LLC ASTRA CLOUD'; all matches are DANA ASTRA / ASTRA GROUP, unrelated. Reviewed 2026-08-27."
+  },
+  {
+   "name": "FirstByte",
+   "country": "RU",
+   "asns": [
+    204997,
+    210703,
+    205090
+   ],
+   "holders": [
+    "FIRSTBYTE-AS FIRST SERVER LIMITED",
+    "FIRSTBYTE-AS FIRSTBYTE HOSTING LTD",
+    "FIRST-SERVER-EUROPE FIRST SERVER LIMITED"
+   ],
+   "note": "Same holder (FIRST SERVER LIMITED) as AS205090, the largest DC-side ASN in the gap read - so this is the one candidate with real OONI signal.",
+   "screen_review": "False positive: token 'first' from 'FIRST SERVER LIMITED'; matches are unrelated companies whose names begin with First. Reviewed 2026-08-27."
+  },
+  {
+   "name": "Adman",
+   "country": "RU",
+   "asns": [
+    57494
+   ],
+   "holders": [
+    "ADMAN-AS Adman LLC"
+   ]
+  },
+  {
+   "name": "RU-CENTER",
+   "country": "RU",
+   "asns": [
+    5537,
+    25537,
+    39494,
+    48287
+   ],
+   "holders": [
+    "RU-CENTER-AS JSC \"RU-CENTER\""
+   ]
+  },
+  {
+   "name": "Yandex Cloud",
+   "country": "RU",
+   "asns": [
+    200350,
+    13238
+   ],
+   "holders": [
+    "YandexCloud Yandex.Cloud LLC",
+    "YANDEX YANDEX LLC"
+   ]
+  },
+  {
+   "name": "Xelent / ATOMDATA",
+   "country": "RU",
+   "asns": [
+    199860
+   ],
+   "holders": [
+    "Xelent-AS ATOMDATA JSC"
+   ]
+  },
+  {
+   "name": "DataLine",
+   "country": "RU",
+   "asns": [
+    34570,
+    35297
+   ],
+   "holders": [
+    "DATALINE-34570-AS Dataline LLC",
+    "DATALINE-AS Dataline LLC"
+   ]
+  },
+  {
+   "name": "HOSTKEY",
+   "country": "NL",
+   "asns": [
+    57043
+   ],
+   "holders": [
+    "HOSTKEY-AS HOSTKEY B.V."
+   ],
+   "note": "Dutch entity selling RU-located servers; the legal counterparty is not Russian.",
+   "screen_review": "Earlier hit was the Dutch suffix 'B.V.'; now stopworded. No designation found. Reviewed 2026-08-27."
+  },
+  {
+   "name": "DDoS-Guard",
+   "country": "RU",
+   "asns": [
+    57724
+   ],
+   "holders": [
+    "DDOS-GUARD DDOS-GUARD LTD"
+   ],
+   "screen_review": "False positive: token 'guard'; matches are IRGC entities. Reviewed 2026-08-27. NOTE: reputational//customer-base concerns about this provider are a separate question from sanctions."
+  },
+  {
+   "name": "StormWall",
+   "country": "CZ",
+   "asns": [
+    59796
+   ],
+   "holders": [
+    "STORMWALL-AS StormWall s.r.o."
+   ]
+  },
+  {
+   "name": "G-Core",
+   "country": "LU",
+   "asns": [
+    199524
+   ],
+   "holders": [
+    "GCORE G-Core Labs S.A."
+   ],
+   "note": "Luxembourg entity of Russian origin; included because it is a common suggestion, not because it is an RU vantage.",
+   "screen_review": "False positive on a generic token; no designation found. Luxembourg entity, not an RU vantage anyway. Reviewed 2026-08-27."
+  },
+  {
+   "name": "EDIS",
+   "country": "EU",
+   "asns": [
+    57169
+   ],
+   "holders": [
+    "EDIS-AS-EU EDIS GmbH"
+   ],
+   "note": "GmbH selling a Moscow VPS from EUR 4.99. Registry agrees it is in Russia (213.183.56.0/24, netname EDIS-RU-NET, country RU, descr 'EDIS Infrastructure in Moscow') but the ROUTING DOES NOT: AS57169's only upstream for that prefix is AS56630 Melbikomas UAB (LT), and every observed path reaches it through European tier-1s (Cogent, Telia, Lumen, GTT, NTT) with no Russian ASN anywhere. So it may be a Russian postcode on a European path -- unverified whether TSPU applies. Pays cleanly by card via Stripe (no crypto rail needed), which is the opposite trade-off from the RU-entity candidates. Looking glass: 213.183.56.10.",
+   "screen_review": "No match. Reviewed 2026-09-09. Counterparty is the GmbH, not Melbicom; both screened."
+  },
+  {
+   "name": "Melbicom",
+   "country": "LT",
+   "asns": [
+    56630
+   ],
+   "holders": [
+    "MELBICOM-EU-AS Melbikomas UAB"
+   ],
+   "note": "Not a candidate itself; EDIS's sole upstream for the Moscow prefix and the maintainer of it (MELBICOM-MNT). Screened because LEGAL-RU.md says to screen affiliates, not just the counterparty.",
+   "screen_review": "Hit was the Lithuanian legal suffix 'UAB' matching UAB FLAVOUR LABS; now stopworded, same shape as the earlier s.l. and b.v. false positives. No designation found. Reviewed 2026-09-09."
+  }
+ ]
 }
