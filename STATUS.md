@@ -2,7 +2,9 @@
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
 > or an open question closes. Last updated: 2026-09-09 (transport enum reconciled against
-> amnezia-client; see the closed open-question below). Prior: 2026-09-01 (re-ran both pre-spend screens — runbook
+> amnezia-client; screens re-run same-day — shortlist unchanged and clear to rent, but the
+> **telegram gap flipped sign**, so Correction 3's sign-flip property does not hold this month).
+> Prior: 2026-09-01 (re-ran both pre-spend screens — runbook
 > step 1 — before renting: OFAC gate unchanged since 2026-08-27, Aeza still SDN-designated and the
 > control case still fires, MTW/Timeweb/Beget still clear; OONI path profiles still Beget near-clean
 > / Timeweb protocol-selective / MTW consumer-like, Correction-3 sign-flip intact. Prior: 2026-08-29
@@ -197,10 +199,18 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
   [phase0/FINDINGS-2026-08-27.md](phase0/FINDINGS-2026-08-27.md)). Correction 3 stands and is
   sharper than stated: within RU hosting ASNs the block rate spreads **87-96 pp on every test**
   (Beget near-clean across Tor/Psiphon/Telegram while consumer operators sit at 75-99%), and the
-  gap's *sign* flips by test (Psiphon +65 pp consumer-vs-DC, Telegram -7.9 pp). So the risk isn't
+  gap's *sign* flipped by test (Psiphon +65 pp consumer-vs-DC, Telegram -7.9 pp). So the risk isn't
   that a VPS is a lenient sensor — it may be an unrelated one. **Consequence: which RU provider you
-  rent decides what you can measure.** Re-run the read before provisioning; the picture is
-  month-specific.
+  rent decides what you can measure.**
+
+  **The sign flip is month-specific and is gone as of 2026-09-09** — telegram read −2.7 pp on
+  09-01 and **+6.4 pp** today, both with disjoint intervals, so this is a real move rather than a
+  CI wobble. All three tests now point the same way (tor +8.3, psiphon +62.0, telegram +6.4).
+  Correction 3 itself is unaffected and if anything cleaner: the load-bearing evidence is the
+  spread *between* hosting providers, and that is intact — within the DC bucket today, Beget sits
+  at 13.6% on `tor` against Timeweb's 99.3%, ~86 pp apart. Treat "DC is uniformly more lenient"
+  as this month's shape, not a property. Re-run before provisioning; the picture is month-specific
+  and has now demonstrably changed twice.
 - ~~Current Russian legal exposure for running a sensor / recruiting volunteers~~ — **research
   pass done** (2026-08-27, [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md); not legal advice, re-read at
   rent time). Sensing-layer RU exposure is low *conditional on a hard rule*: the battery only ever
@@ -254,6 +264,14 @@ runbook below, in order. Steps 1-3 are an afternoon; step 4 is the week that tes
    consumer-like (psiphon 78%); Correction-3 sign-flip intact (psiphon +64pp, telegram −2.7pp,
    tor +7.7pp). **Shortlist unchanged — clear to rent.** Re-run again if more than a few weeks pass
    before provisioning.
+   **Re-run 2026-09-09** ([phase0/PROVIDER-SCREEN-2026-09-09.md](phase0/PROVIDER-SCREEN-2026-09-09.md),
+   [phase0/gap-2026-09-09.md](phase0/gap-2026-09-09.md)): sanctions picture unchanged — Aeza still
+   fires 3 SDN hits (control good), Timeweb and Beget still no match, MTW still the same 4
+   `ekspert` token collisions, none of which is MTW. Path profiles hold: Beget near-clean
+   (tor 16.0% / psiphon 3.7% / telegram 7.4%), Timeweb selective (99.6% / 9.0% / 98.4%), MTW
+   consumer-like (psiphon 79.7%). **Shortlist still clear to rent.** The one change is the
+   telegram gap sign flip described above — it does not affect which providers to buy, only what
+   the Phase 0 read is allowed to say about DC-vs-consumer shape.
 
 2. **Rent.** One non-RU echo server (anywhere outside RU with a stable public IP) and **2-3 RU
    sensors at different providers** — the spread between RU hosting providers is 87-96 pp, so one

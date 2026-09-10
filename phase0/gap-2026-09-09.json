@@ -1,0 +1,1476 @@
+{
+ "meta": {
+  "cc": "RU",
+  "since": "2026-08-10",
+  "until": "2026-09-09",
+  "tests": [
+   "tor",
+   "torsf",
+   "psiphon",
+   "telegram",
+   "riseupvpn"
+  ],
+  "min_n": 20,
+  "source": "https://api.ooni.io/api/v1/aggregation",
+  "names_source": "https://stat.ripe.net/data/as-names/data.json",
+  "dc_source": null
+ },
+ "tests": {
+  "tor": {
+   "consumer": {
+    "graded": 29912,
+    "anomaly": 29694,
+    "ok": 218,
+    "failure": 1,
+    "confirmed": 0,
+    "rate": 0.9927119550682001,
+    "ci": [
+     0.9916827305936964,
+     0.9936146377410792
+    ],
+    "asn_count": 73
+   },
+   "hosting": {
+    "graded": 718,
+    "anomaly": 653,
+    "ok": 65,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.9094707520891365,
+    "ci": [
+     0.8862458095238854,
+     0.9283373344788987
+    ],
+    "asn_count": 5,
+    "per_asn": [
+     {
+      "asn": 205090,
+      "name": "FIRST-SERVER-EUROPE FIRST SERVER LIMITED",
+      "graded": 475,
+      "anomaly": 433,
+      "rate": 0.911578947368421,
+      "ci": [
+       0.8826341507067391,
+       0.9339197994930764
+      ]
+     },
+     {
+      "asn": 9123,
+      "name": "TimeWeb-AS JSC \"TIMEWEB\"",
+      "graded": 149,
+      "anomaly": 148,
+      "rate": 0.9932885906040269,
+      "ci": [
+       0.9629657210400328,
+       0.9988143179022451
+      ]
+     },
+     {
+      "asn": 209641,
+      "name": "I-SERVERS-EAST IHOR HOSTING LTD",
+      "graded": 43,
+      "anomaly": 40,
+      "rate": 0.9302325581395349,
+      "ci": [
+       0.8139073144696507,
+       0.9759888462080376
+      ]
+     },
+     {
+      "asn": 208677,
+      "name": "CLOUDRU-AS \"Cloud Technologies\" LLC trading as Cloud.ru",
+      "graded": 29,
+      "anomaly": 29,
+      "rate": 1.0,
+      "ci": [
+       0.8830264055344442,
+       1.0000000000000002
+      ]
+     },
+     {
+      "asn": 198610,
+      "name": "BEGET-AS Beget LLC",
+      "graded": 22,
+      "anomaly": 3,
+      "rate": 0.13636363636363635,
+      "ci": [
+       0.04748917264236267,
+       0.3333541187947
+      ]
+     }
+    ]
+   },
+   "unclassified": {
+    "graded": 13850,
+    "anomaly": 12748,
+    "ok": 1102,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.9204332129963899,
+    "ci": [
+     0.915808687216374,
+     0.9248245707818985
+    ],
+    "asn_count": 105
+   },
+   "gap_pp": 8.324120297906356,
+   "intervals_disjoint": true
+  },
+  "torsf": {
+   "consumer": {
+    "graded": 521,
+    "anomaly": 439,
+    "ok": 82,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.8426103646833013,
+    "ci": [
+     0.8088457295907381,
+     0.8713594980436568
+    ],
+    "asn_count": 3
+   },
+   "hosting": {
+    "graded": 0,
+    "anomaly": 0,
+    "ok": 0,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": null,
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "asn_count": 0,
+    "per_asn": []
+   },
+   "unclassified": {
+    "graded": 25,
+    "anomaly": 4,
+    "ok": 21,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.16,
+    "ci": [
+     0.06403347608577989,
+     0.34654013980238163
+    ],
+    "asn_count": 1
+   },
+   "gap_pp": null,
+   "intervals_disjoint": false
+  },
+  "psiphon": {
+   "consumer": {
+    "graded": 48427,
+    "anomaly": 35012,
+    "ok": 13415,
+    "failure": 3,
+    "confirmed": 0,
+    "rate": 0.7229851116112912,
+    "ci": [
+     0.7189816234936478,
+     0.7269532247663502
+    ],
+    "asn_count": 88
+   },
+   "hosting": {
+    "graded": 775,
+    "anomaly": 80,
+    "ok": 695,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.1032258064516129,
+    "ci": [
+     0.08372527835105253,
+     0.1266404750961182
+    ],
+    "asn_count": 7,
+    "per_asn": [
+     {
+      "asn": 205090,
+      "name": "FIRST-SERVER-EUROPE FIRST SERVER LIMITED",
+      "graded": 476,
+      "anomaly": 21,
+      "rate": 0.04411764705882353,
+      "ci": [
+       0.029033953375002357,
+       0.06650090646207722
+      ]
+     },
+     {
+      "asn": 9123,
+      "name": "TimeWeb-AS JSC \"TIMEWEB\"",
+      "graded": 150,
+      "anomaly": 30,
+      "rate": 0.2,
+      "ci": [
+       0.1438399280560674,
+       0.27114275543136385
+      ]
+     },
+     {
+      "asn": 209641,
+      "name": "I-SERVERS-EAST IHOR HOSTING LTD",
+      "graded": 45,
+      "anomaly": 1,
+      "rate": 0.022222222222222223,
+      "ci": [
+       0.003933497522757507,
+       0.11566946388718814
+      ]
+     },
+     {
+      "asn": 48347,
+      "name": "MTW-AS JSC Mediasoft ekspert",
+      "graded": 30,
+      "anomaly": 27,
+      "rate": 0.9,
+      "ci": [
+       0.7437855868473338,
+       0.9654007400402839
+      ]
+     },
+     {
+      "asn": 208677,
+      "name": "CLOUDRU-AS \"Cloud Technologies\" LLC trading as Cloud.ru",
+      "graded": 29,
+      "anomaly": 1,
+      "rate": 0.034482758620689655,
+      "ci": [
+       0.006113056614032264,
+       0.17175891064700252
+      ]
+     },
+     {
+      "asn": 198610,
+      "name": "BEGET-AS Beget LLC",
+      "graded": 24,
+      "anomaly": 0,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.13798057582897535
+      ]
+     },
+     {
+      "asn": 50340,
+      "name": "SELECTEL-MSK JSC Selectel",
+      "graded": 21,
+      "anomaly": 0,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.15464382326420195
+      ]
+     }
+    ]
+   },
+   "unclassified": {
+    "graded": 27226,
+    "anomaly": 19382,
+    "ok": 7844,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.7118930434143833,
+    "ci": [
+     0.7064838655155576,
+     0.7172424333550167
+    ],
+    "asn_count": 165
+   },
+   "gap_pp": 61.975930515967825,
+   "intervals_disjoint": true
+  },
+  "telegram": {
+   "consumer": {
+    "graded": 29728,
+    "anomaly": 25835,
+    "ok": 3893,
+    "failure": 2,
+    "confirmed": 0,
+    "rate": 0.8690460172228203,
+    "ci": [
+     0.8651633853901788,
+     0.8728332814560485
+    ],
+    "asn_count": 75
+   },
+   "hosting": {
+    "graded": 686,
+    "anomaly": 552,
+    "ok": 134,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.8046647230320699,
+    "ci": [
+     0.7733339743092155,
+     0.8326022290163014
+    ],
+    "asn_count": 5,
+    "per_asn": [
+     {
+      "asn": 205090,
+      "name": "FIRST-SERVER-EUROPE FIRST SERVER LIMITED",
+      "graded": 440,
+      "anomaly": 333,
+      "rate": 0.7568181818181818,
+      "ci": [
+       0.7146214901813164,
+       0.794569176038344
+      ]
+     },
+     {
+      "asn": 9123,
+      "name": "TimeWeb-AS JSC \"TIMEWEB\"",
+      "graded": 148,
+      "anomaly": 145,
+      "rate": 0.9797297297297297,
+      "ci": [
+       0.9421022566020937,
+       0.9930828310155289
+      ]
+     },
+     {
+      "asn": 209641,
+      "name": "I-SERVERS-EAST IHOR HOSTING LTD",
+      "graded": 44,
+      "anomaly": 44,
+      "rate": 1.0,
+      "ci": [
+       0.919701682217986,
+       0.9999999999999998
+      ]
+     },
+     {
+      "asn": 208677,
+      "name": "CLOUDRU-AS \"Cloud Technologies\" LLC trading as Cloud.ru",
+      "graded": 30,
+      "anomaly": 30,
+      "rate": 1.0,
+      "ci": [
+       0.886482908609522,
+       1.0
+      ]
+     },
+     {
+      "asn": 198610,
+      "name": "BEGET-AS Beget LLC",
+      "graded": 24,
+      "anomaly": 0,
+      "rate": 0.0,
+      "ci": [
+       0.0,
+       0.13798057582897535
+      ]
+     }
+    ]
+   },
+   "unclassified": {
+    "graded": 13811,
+    "anomaly": 11558,
+    "ok": 2253,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.8368691622619651,
+    "ci": [
+     0.8306133668896044,
+     0.8429376060003054
+    ],
+    "asn_count": 106
+   },
+   "gap_pp": 6.438129419075034,
+   "intervals_disjoint": true
+  },
+  "riseupvpn": {
+   "consumer": {
+    "graded": 0,
+    "anomaly": 0,
+    "ok": 0,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": null,
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "asn_count": 0
+   },
+   "hosting": {
+    "graded": 0,
+    "anomaly": 0,
+    "ok": 0,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": null,
+    "ci": [
+     0.0,
+     0.0
+    ],
+    "asn_count": 0,
+    "per_asn": []
+   },
+   "unclassified": {
+    "graded": 336,
+    "anomaly": 0,
+    "ok": 336,
+    "failure": 0,
+    "confirmed": 0,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.011304089905414755
+    ],
+    "asn_count": 1
+   },
+   "gap_pp": null,
+   "intervals_disjoint": false
+  }
+ },
+ "asns": {
+  "3200": {
+   "name": "ASNAVICON UK Navikon LLC.",
+   "class": "unclassified"
+  },
+  "3216": {
+   "name": "SOVAM-AS PJSC \"Vimpelcom\"",
+   "class": "consumer_isp"
+  },
+  "3226": {
+   "name": "MARK-ITT-AS OOO \"NI\"",
+   "class": "unclassified"
+  },
+  "3267": {
+   "name": "niks SCIENTIFIC RESEARCH INSTITUTE FOR SYSTEM ANALYSIS OF THE NATIONAL RESEARCH CENTRE \"KURCHATOV INSTITUTE\"",
+   "class": "unclassified"
+  },
+  "5572": {
+   "name": "BOTIK Botik Technologies LTD",
+   "class": "unclassified"
+  },
+  "5573": {
+   "name": "KRASNET-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "6789": {
+   "name": "CRELCOM-NET CRELCOM LLC",
+   "class": "unclassified"
+  },
+  "6856": {
+   "name": "IC-VORONEZH-AS AO IK \"Informsvyaz-Chernozemye\"",
+   "class": "unclassified"
+  },
+  "8242": {
+   "name": "INTELWAY-AS Digital Solutions LLC",
+   "class": "unclassified"
+  },
+  "8334": {
+   "name": "CO-2COM-AS JOINT-STOCK COMPANY \"TELEPORT TELECOM\"",
+   "class": "unclassified"
+  },
+  "8359": {
+   "name": "MTS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "8369": {
+   "name": "INTERSVYAZ-AS Intersvyaz-2 JSC",
+   "class": "consumer_isp"
+  },
+  "8402": {
+   "name": "CORBINA-AS PJSC \"Vimpelcom\"",
+   "class": "consumer_isp"
+  },
+  "8416": {
+   "name": "INFOLINE-AS InfoLada Ltd",
+   "class": "unclassified"
+  },
+  "8636": {
+   "name": "MAXNET MAXnet Systems Ltd.",
+   "class": "unclassified"
+  },
+  "8641": {
+   "name": "NAUKANET-AS LLC \"Nauka-Svyaz\"",
+   "class": "unclassified"
+  },
+  "8749": {
+   "name": "REDCOM-AS JSC \"Redcom-lnternet\"",
+   "class": "unclassified"
+  },
+  "8774": {
+   "name": "Etype OOO Kompaniya Etype",
+   "class": "unclassified"
+  },
+  "9009": {
+   "name": "M247 M247 Europe SRL",
+   "class": "unclassified"
+  },
+  "9123": {
+   "name": "TimeWeb-AS JSC \"TIMEWEB\"",
+   "class": "hosting_dc"
+  },
+  "12389": {
+   "name": "ROSTELECOM-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "12494": {
+   "name": "ASN-POSTLTD OOO \"Post ltd\"",
+   "class": "unclassified"
+  },
+  "12668": {
+   "name": "MIRALOGIC-AS LLC \"KomTehCentr\"",
+   "class": "unclassified"
+  },
+  "12714": {
+   "name": "MEGAFON-AS PJSC MegaFon",
+   "class": "consumer_isp"
+  },
+  "12722": {
+   "name": "RECONN RECONN LLC",
+   "class": "unclassified"
+  },
+  "12737": {
+   "name": "RIGHTSIDE16 KrasPromStroy, LLC",
+   "class": "unclassified"
+  },
+  "12768": {
+   "name": "ER-TELECOM-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "12958": {
+   "name": "MCC T2 Mobile LLC",
+   "class": "consumer_isp"
+  },
+  "13227": {
+   "name": "KRAFT-S Kraft-S LLC",
+   "class": "unclassified"
+  },
+  "15378": {
+   "name": "TELE2-RU-AS T2 Mobile LLC",
+   "class": "consumer_isp"
+  },
+  "15640": {
+   "name": "FPIC-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "15673": {
+   "name": "TELESETI-PLUS-AS Teleseti Plus Ltd.",
+   "class": "unclassified"
+  },
+  "15774": {
+   "name": "TTK-RTL Limited Liability Company \"TTK-Svyaz\"",
+   "class": "consumer_isp"
+  },
+  "16345": {
+   "name": "BEE-AS PJSC \"Vimpelcom\"",
+   "class": "consumer_isp"
+  },
+  "20485": {
+   "name": "TRANSTELECOM Joint Stock Company TransTeleCom",
+   "class": "consumer_isp"
+  },
+  "20590": {
+   "name": "DEC-AS Donbass Electronic Communications Ltd.",
+   "class": "unclassified"
+  },
+  "21017": {
+   "name": "VSI-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "21365": {
+   "name": "INTELECA-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "24699": {
+   "name": "IVTELECOM-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "24739": {
+   "name": "SEVEREN-TELECOM JSC \"Severen-Telecom\"",
+   "class": "consumer_isp"
+  },
+  "24955": {
+   "name": "UBN-AS JSC \"Ufanet\"",
+   "class": "consumer_isp"
+  },
+  "25159": {
+   "name": "SONICDUO-AS PJSC MegaFon",
+   "class": "consumer_isp"
+  },
+  "25227": {
+   "name": "ASN-AVANTEL-MSK JSC Avantel",
+   "class": "unclassified"
+  },
+  "25490": {
+   "name": "STC-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "25513": {
+   "name": "ASN-MGTS-USPD PJSC Moscow city telephone network",
+   "class": "consumer_isp"
+  },
+  "25515": {
+   "name": "CTCNET-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "28745": {
+   "name": "SUTTK-AS Joint Stock Company TransTeleCom",
+   "class": "consumer_isp"
+  },
+  "28840": {
+   "name": "TATTELECOM-AS PJSC \"TATTELECOM\"",
+   "class": "unclassified"
+  },
+  "28890": {
+   "name": "INSYS-AS INSYS LLC",
+   "class": "unclassified"
+  },
+  "29124": {
+   "name": "ISKRATELECOM-AS Iskratelecom JSC",
+   "class": "consumer_isp"
+  },
+  "29182": {
+   "name": "RU-JSCIOT JSC IOT",
+   "class": "unclassified"
+  },
+  "29190": {
+   "name": "OVERTA-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "29194": {
+   "name": "ASN-TVT MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "29303": {
+   "name": "PIC-AS Perm Internet Company LLC",
+   "class": "unclassified"
+  },
+  "29319": {
+   "name": "ASN-IMSYS Informational-measuring systems Ltd.",
+   "class": "unclassified"
+  },
+  "30922": {
+   "name": "MTS-FBN-Siberia-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "31028": {
+   "name": "NOVOE-KTV-AS Novoe Kabelnoe Television Ltd.",
+   "class": "unclassified"
+  },
+  "31133": {
+   "name": "MF-MGSM-AS PJSC MegaFon",
+   "class": "consumer_isp"
+  },
+  "31200": {
+   "name": "NTK Novotelecom Ltd",
+   "class": "consumer_isp"
+  },
+  "31205": {
+   "name": "MF-SIB-AS PJSC MegaFon",
+   "class": "consumer_isp"
+  },
+  "31213": {
+   "name": "MF-NWGSM-AS PJSC MegaFon",
+   "class": "consumer_isp"
+  },
+  "31214": {
+   "name": "TIS-DIALOG-AS TIS Dialog LLC",
+   "class": "unclassified"
+  },
+  "31363": {
+   "name": "MOSCOW-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "31370": {
+   "name": "MOSLINE-AS OOO \"Gruppa MosLine\"",
+   "class": "unclassified"
+  },
+  "33871": {
+   "name": "Norilsk-Telecom-AS Norilsk-Telecom JSC",
+   "class": "unclassified"
+  },
+  "33934": {
+   "name": "VolgogradEC-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "33991": {
+   "name": "IGRA-SERVICE-AS IGRA-SERVICE LLC",
+   "class": "unclassified"
+  },
+  "34150": {
+   "name": "RU-ERTH-KRASNODAR-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "34464": {
+   "name": "ZEISS-AS Media Sououz Ltd.",
+   "class": "unclassified"
+  },
+  "34533": {
+   "name": "ESAMARA-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "34590": {
+   "name": "IZHEVSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "34602": {
+   "name": "STARLINK-AS MEGASVYAZ LLC",
+   "class": "unclassified"
+  },
+  "34757": {
+   "name": "SIBSET-NSK-AS Sibirskie Seti Ltd.",
+   "class": "unclassified"
+  },
+  "35000": {
+   "name": "SEVEREN-TELECOM_TRANSIT JSC \"Severen-Telecom\"",
+   "class": "consumer_isp"
+  },
+  "35125": {
+   "name": "SMOLENSK-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "35401": {
+   "name": "SUNLINK-AS AO \"Tele-Service Tula\"",
+   "class": "unclassified"
+  },
+  "35539": {
+   "name": "INFOLINK-T-AS Information and Communication Technologies LLC",
+   "class": "unclassified"
+  },
+  "35598": {
+   "name": "INETCOM INETCOM CARRIER LLC",
+   "class": "unclassified"
+  },
+  "35807": {
+   "name": "AS-SKYNET-SPB SkyNet Ltd.",
+   "class": "consumer_isp"
+  },
+  "35816": {
+   "name": "SEVSTAR Lancom Ltd.",
+   "class": "unclassified"
+  },
+  "39001": {
+   "name": "MTS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "39028": {
+   "name": "ULSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "39087": {
+   "name": "PAKT-AS P.A.K.T LLC",
+   "class": "unclassified"
+  },
+  "39102": {
+   "name": "",
+   "class": "unclassified"
+  },
+  "39256": {
+   "name": "FANNET Dom-TV LLC",
+   "class": "unclassified"
+  },
+  "39435": {
+   "name": "EVOLGOGRAD-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "39493": {
+   "name": "RU-KSTV CJSC Kolomna-Sviaz TV",
+   "class": "unclassified"
+  },
+  "39593": {
+   "name": "ML-AS JSC \"Ufanet\"",
+   "class": "consumer_isp"
+  },
+  "39785": {
+   "name": "AXIOMA Axioma, LLC",
+   "class": "consumer_isp"
+  },
+  "39927": {
+   "name": "Elight-AS E-Light-Telecom Ltd.",
+   "class": "unclassified"
+  },
+  "41275": {
+   "name": "LEALTA-AS Lovitel LLC",
+   "class": "unclassified"
+  },
+  "41330": {
+   "name": "T2-NOVOSIBIRSK-AS T2 Mobile LLC",
+   "class": "consumer_isp"
+  },
+  "41668": {
+   "name": "ERTH-KAZAN-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "41704": {
+   "name": "OGS-AS JSC \"Ufanet\"",
+   "class": "consumer_isp"
+  },
+  "41733": {
+   "name": "ZTELECOM-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "41786": {
+   "name": "ERTH-YOLA-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "41843": {
+   "name": "ERTH-OMSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "41904": {
+   "name": "LLC12BIT-AS LLC 12BIT",
+   "class": "unclassified"
+  },
+  "42024": {
+   "name": "CRYPTOPRO-AS CryptoPro LTD",
+   "class": "unclassified"
+  },
+  "42065": {
+   "name": "ETELECOM-AS Global Network Management Inc",
+   "class": "unclassified"
+  },
+  "42116": {
+   "name": "ERTH-NCHLN-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "42569": {
+   "name": "PSKSET-AS PSK-SET LLC",
+   "class": "unclassified"
+  },
+  "42610": {
+   "name": "NCNET-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "42668": {
+   "name": "NEVALINK-AS Nevalink, LLC",
+   "class": "unclassified"
+  },
+  "42682": {
+   "name": "ERTH-NNOV-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "42683": {
+   "name": "ERTH-OREN-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "42842": {
+   "name": "HELIOS-TV-AS PJSC \"Vimpelcom\"",
+   "class": "consumer_isp"
+  },
+  "42893": {
+   "name": "NWLINK-AS Home Internet Ltd",
+   "class": "unclassified"
+  },
+  "43148": {
+   "name": "MTS-KURGAN-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "43434": {
+   "name": "CONTACTTV-AS CJSC Contact TV",
+   "class": "unclassified"
+  },
+  "43574": {
+   "name": "DAGSV-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "44020": {
+   "name": "CLN-AS Modern Solutions LTD",
+   "class": "unclassified"
+  },
+  "44050": {
+   "name": "PIN-AS Petersburg Internet Network ltd.",
+   "class": "unclassified"
+  },
+  "44056": {
+   "name": "TRYTECH-AS Trytek LLC",
+   "class": "unclassified"
+  },
+  "44266": {
+   "name": "TEHNO-AS TEHNO Limited Company",
+   "class": "unclassified"
+  },
+  "44341": {
+   "name": "SEVONLINE Nikita Sergienko",
+   "class": "unclassified"
+  },
+  "44546": {
+   "name": "ALFATELECOM-AS ALFA TELECOM s.r.o.",
+   "class": "unclassified"
+  },
+  "44923": {
+   "name": "AIRNET Saint-Petersburg Computer Networks Ltd.",
+   "class": "unclassified"
+  },
+  "47235": {
+   "name": "DONAPEX-AS Don Apex LLC",
+   "class": "unclassified"
+  },
+  "47236": {
+   "name": "CITYLINK-AS CityLink Ltd",
+   "class": "unclassified"
+  },
+  "47586": {
+   "name": "Business-Svyaz Dmitriy V. Kozmenko",
+   "class": "unclassified"
+  },
+  "47759": {
+   "name": "POIG-AS POIG Ltd.",
+   "class": "unclassified"
+  },
+  "47914": {
+   "name": "CreativeDirectMarketingSolutions OOO Creative Direct Marketing Solutions",
+   "class": "unclassified"
+  },
+  "48073": {
+   "name": "",
+   "class": "unclassified"
+  },
+  "48092": {
+   "name": "NSB-AS T2 Mobile LLC",
+   "class": "consumer_isp"
+  },
+  "48190": {
+   "name": "T2-EKATERINBURG-AS T2 Mobile LLC",
+   "class": "consumer_isp"
+  },
+  "48327": {
+   "name": "Ray-AS Ray-Svyaz Ltd.",
+   "class": "unclassified"
+  },
+  "48467": {
+   "name": "PRANET-AS \"Pronet\" LLC",
+   "class": "unclassified"
+  },
+  "48612": {
+   "name": "RTC-ORENBURG-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "48642": {
+   "name": "FOR-AS Joint stock company \"For\"",
+   "class": "unclassified"
+  },
+  "48822": {
+   "name": "UNIVERSUMNET-AS Universum bit Ltd.",
+   "class": "unclassified"
+  },
+  "48909": {
+   "name": "CityLine CityLine LLC",
+   "class": "unclassified"
+  },
+  "49136": {
+   "name": "TELECOM-NETWORKS-AS Telecommunication networks Ltd",
+   "class": "unclassified"
+  },
+  "49320": {
+   "name": "INN361-AS Golitsyno Telecom Ltd",
+   "class": "unclassified"
+  },
+  "49403": {
+   "name": "AVK-WELLCOM-AS AVK-Wellcom Ltd.",
+   "class": "unclassified"
+  },
+  "49718": {
+   "name": "NTS-REAL-AS Nizhnevolzhskie Telecommunication Networks Real LLC",
+   "class": "unclassified"
+  },
+  "49897": {
+   "name": "AliansNet Alians Telecom Ltd.",
+   "class": "unclassified"
+  },
+  "50473": {
+   "name": "ECO-AS Altagen JSC",
+   "class": "unclassified"
+  },
+  "50477": {
+   "name": "SV-EN-AS Svyaz-Energo Ltd.",
+   "class": "unclassified"
+  },
+  "50544": {
+   "name": "KRSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "50716": {
+   "name": "TELECOMRUNET Telecom.ru Ltd",
+   "class": "unclassified"
+  },
+  "50776": {
+   "name": "SYSTEMTELECOM Joint Stock Company System Telecom",
+   "class": "unclassified"
+  },
+  "50923": {
+   "name": "METRO-SET-AS Metroset Ltd.",
+   "class": "unclassified"
+  },
+  "51032": {
+   "name": "NEVOD-AS LLC POWERNET",
+   "class": "unclassified"
+  },
+  "51035": {
+   "name": "UFA-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "51084": {
+   "name": "IDEA-LTD-AS Idea Ltd.",
+   "class": "unclassified"
+  },
+  "51369": {
+   "name": "FIORD-RU-AS LLC \"TRC FIORD\"",
+   "class": "unclassified"
+  },
+  "51604": {
+   "name": "EKAT-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "51645": {
+   "name": "IRKUTSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "51659": {
+   "name": "ASBAXET LLC Baxet",
+   "class": "unclassified"
+  },
+  "52015": {
+   "name": "DANCER-AS Dancer LLC",
+   "class": "unclassified"
+  },
+  "56377": {
+   "name": "MGSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "56981": {
+   "name": "TOMSK-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "57128": {
+   "name": "KGS-NET JSC \"Ufanet\"",
+   "class": "consumer_isp"
+  },
+  "57261": {
+   "name": "YARTV-AS YarTV Ltd.",
+   "class": "unclassified"
+  },
+  "57354": {
+   "name": "SYSTEMA-AS SYSTEMA Ltd",
+   "class": "unclassified"
+  },
+  "57393": {
+   "name": "VIVA-AS Viva LLC",
+   "class": "unclassified"
+  },
+  "59584": {
+   "name": "INDIKOM-AS INDIKOM LLC",
+   "class": "unclassified"
+  },
+  "59815": {
+   "name": "TRINITY-AS Trinity Ltd",
+   "class": "unclassified"
+  },
+  "60095": {
+   "name": "NN-AS JSC \"Ufanet\"",
+   "class": "consumer_isp"
+  },
+  "60246": {
+   "name": "PG-19 Consumer Internet Cooperative PG-19",
+   "class": "unclassified"
+  },
+  "60660": {
+   "name": "ASTotalvideo Totalvideo LLC",
+   "class": "unclassified"
+  },
+  "60852": {
+   "name": "ASCOMPSERVICE Computer Service LLC",
+   "class": "unclassified"
+  },
+  "196797": {
+   "name": "CityTeleNet Joint Stock Company TransTeleCom",
+   "class": "consumer_isp"
+  },
+  "196949": {
+   "name": "PODRYAD-AS Natalia Sergeevna Filicheva",
+   "class": "unclassified"
+  },
+  "197023": {
+   "name": "ASCOMTELTV MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "197078": {
+   "name": "YARNET-AS Yarnet Ltd",
+   "class": "consumer_isp"
+  },
+  "197204": {
+   "name": "Telemaks TeleMaks Ltd",
+   "class": "unclassified"
+  },
+  "197453": {
+   "name": "BIZTEL-AS Biz Telecom LLC",
+   "class": "unclassified"
+  },
+  "198610": {
+   "name": "BEGET-AS Beget LLC",
+   "class": "hosting_dc"
+  },
+  "199599": {
+   "name": "CIREX Telecom-Birzha, LLC",
+   "class": "unclassified"
+  },
+  "201825": {
+   "name": "RUSPHONE-AS LLC \"ER-Telecom Moscow\"",
+   "class": "consumer_isp"
+  },
+  "201952": {
+   "name": "Atel-Rybinsk LTD AtelRybinsk",
+   "class": "unclassified"
+  },
+  "203451": {
+   "name": "K-Telecom-Network K-telekom LLC",
+   "class": "unclassified"
+  },
+  "205090": {
+   "name": "FIRST-SERVER-EUROPE FIRST SERVER LIMITED",
+   "class": "hosting_dc"
+  },
+  "206448": {
+   "name": "SouthTransTelecom-AS LLC \"SouthTransTelecom\"",
+   "class": "unclassified"
+  },
+  "208677": {
+   "name": "CLOUDRU-AS \"Cloud Technologies\" LLC trading as Cloud.ru",
+   "class": "hosting_dc"
+  },
+  "209641": {
+   "name": "I-SERVERS-EAST IHOR HOSTING LTD",
+   "class": "hosting_dc"
+  },
+  "210616": {
+   "name": "SIBMEDVED-AS SM Ltd.",
+   "class": "unclassified"
+  },
+  "212461": {
+   "name": "",
+   "class": "unclassified"
+  },
+  "214173": {
+   "name": "Sever-Telecom-SPb Sever Telecom JSC",
+   "class": "unclassified"
+  },
+  "215402": {
+   "name": "ASAD-AS Asadov Ruslan Rafaelevich",
+   "class": "unclassified"
+  },
+  "216366": {
+   "name": "Smart-tel SMART-TEL LLC",
+   "class": "unclassified"
+  },
+  "8324": {
+   "name": "URC-AS South Ural State University",
+   "class": "unclassified"
+  },
+  "8595": {
+   "name": "WESTCALL-AS OOO WestCall Ltd.",
+   "class": "unclassified"
+  },
+  "8998": {
+   "name": "TUMTTL-AS \"Russian company\" LLC",
+   "class": "unclassified"
+  },
+  "12730": {
+   "name": "INECO_AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "12772": {
+   "name": "ENFORTA-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "15493": {
+   "name": "RUSCOMP-AS \"Russian company\" LLC",
+   "class": "unclassified"
+  },
+  "21453": {
+   "name": "FLEX-AS Flex Ltd.",
+   "class": "unclassified"
+  },
+  "21479": {
+   "name": "ROSTOV-TELEGRAF-AS PJSC Rostelecom",
+   "class": "consumer_isp"
+  },
+  "24689": {
+   "name": "ROSINTEL-AS JSC Rosin.telekom",
+   "class": "unclassified"
+  },
+  "28891": {
+   "name": "CITTEL CJSC City Telecom",
+   "class": "unclassified"
+  },
+  "29226": {
+   "name": "MASTERTEL-AS JSC Mastertel",
+   "class": "unclassified"
+  },
+  "29329": {
+   "name": "NODEX-AS Resource-M LLC",
+   "class": "unclassified"
+  },
+  "30833": {
+   "name": "TNC-AS Technology & Networks LLC",
+   "class": "unclassified"
+  },
+  "30881": {
+   "name": "TENSOR-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "31257": {
+   "name": "ORIONNET-KRK Orion Telecom LLC",
+   "class": "consumer_isp"
+  },
+  "34047": {
+   "name": "DGROUP-AS LLC Internet-Service",
+   "class": "unclassified"
+  },
+  "34123": {
+   "name": "NETORN-AS Netorn LLC",
+   "class": "unclassified"
+  },
+  "34223": {
+   "name": "N-REGION N-Region LLC",
+   "class": "unclassified"
+  },
+  "35271": {
+   "name": "AVIEL-AS JSC \"AVIEL\"",
+   "class": "unclassified"
+  },
+  "35810": {
+   "name": "BIGTELECOM-AS Big Telecom JSC",
+   "class": "unclassified"
+  },
+  "39045": {
+   "name": "Gaztelecom-AS Gazprom telecom LLC",
+   "class": "unclassified"
+  },
+  "39812": {
+   "name": "KAMENSKTEL-AS Closed Joint Stock Company Radiotelephone",
+   "class": "unclassified"
+  },
+  "41560": {
+   "name": "UT-SVR UGMK-Telecom LLC",
+   "class": "unclassified"
+  },
+  "41601": {
+   "name": "OBLTEL-AS NEO Print Ltd.",
+   "class": "unclassified"
+  },
+  "41754": {
+   "name": "ERTH-PENZA-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "41789": {
+   "name": "TELEDYNE-AS LLC Teledyne Systems Limited",
+   "class": "unclassified"
+  },
+  "42110": {
+   "name": "STK-AS PJSC \"Vimpelcom\"",
+   "class": "consumer_isp"
+  },
+  "42136": {
+   "name": "DVTK-AS DVTK LLC",
+   "class": "unclassified"
+  },
+  "42291": {
+   "name": "ISTRANET-AS OOO Istranet",
+   "class": "unclassified"
+  },
+  "42511": {
+   "name": "STATION-AS Connect LLC",
+   "class": "unclassified"
+  },
+  "42518": {
+   "name": "UNETCOM-AS Unet Communication LLC",
+   "class": "unclassified"
+  },
+  "42608": {
+   "name": "YAMALSOFT-AS Yamal-Soft 2003 Ltd.",
+   "class": "unclassified"
+  },
+  "43235": {
+   "name": "SPRINTInet-NVR-AS SPRINT INET LLC",
+   "class": "unclassified"
+  },
+  "43270": {
+   "name": "IT-TELECOM-AS Ryabikov Ivan",
+   "class": "unclassified"
+  },
+  "43667": {
+   "name": "VRMNT-AS Vermont-IT Limited Liability Company",
+   "class": "unclassified"
+  },
+  "43714": {
+   "name": "EPL-AS Production co-operative Economic-legal laboratory",
+   "class": "unclassified"
+  },
+  "44128": {
+   "name": "INTERNET-PRO-AS Internet-Pro LLC",
+   "class": "unclassified"
+  },
+  "44391": {
+   "name": "ESD-AS JSC Elektrosvyaz",
+   "class": "unclassified"
+  },
+  "44715": {
+   "name": "GLOBALCOM-AS Globalcom Ltd.",
+   "class": "unclassified"
+  },
+  "44724": {
+   "name": "OCTOPUSNET-AS Octopusnet LTD",
+   "class": "unclassified"
+  },
+  "44927": {
+   "name": "Telecom-MPK LLC Telecom MPK",
+   "class": "unclassified"
+  },
+  "47119": {
+   "name": "VLTELECOM JSC \"Ufanet\"",
+   "class": "consumer_isp"
+  },
+  "47626": {
+   "name": "ASTIMER Timer, LLC",
+   "class": "unclassified"
+  },
+  "47895": {
+   "name": "R-LINE-AS LTD \"Erline\"",
+   "class": "unclassified"
+  },
+  "48078": {
+   "name": "DAGOMYS-AS Dagomys Telecom LLC",
+   "class": "unclassified"
+  },
+  "48123": {
+   "name": "STREAM-TV-KALUGA MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "48347": {
+   "name": "MTW-AS JSC Mediasoft ekspert",
+   "class": "hosting_dc"
+  },
+  "48416": {
+   "name": "INFOLAN-AS Information Network, LLC",
+   "class": "unclassified"
+  },
+  "48441": {
+   "name": "MAGLAN-AS MagLAN LLC",
+   "class": "unclassified"
+  },
+  "49120": {
+   "name": "GORSET-AS Gorset Ltd.",
+   "class": "unclassified"
+  },
+  "49825": {
+   "name": "LNTK Lantek LLC",
+   "class": "unclassified"
+  },
+  "50340": {
+   "name": "SELECTEL-MSK JSC Selectel",
+   "class": "hosting_dc"
+  },
+  "50542": {
+   "name": "VORONEZH-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "51341": {
+   "name": "GCS-AS Gigakom Sistems OOO",
+   "class": "unclassified"
+  },
+  "51570": {
+   "name": "SPB-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "51819": {
+   "name": "YAR-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "52207": {
+   "name": "TULA-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "56534": {
+   "name": "Comfortel Comfortel Ltd.",
+   "class": "unclassified"
+  },
+  "56701": {
+   "name": "AVANTA-AS LLC \"AVANTA TELECOM\"",
+   "class": "unclassified"
+  },
+  "56724": {
+   "name": "TINCO Teleskan-Intercom Ltd",
+   "class": "unclassified"
+  },
+  "56761": {
+   "name": "MULTINEX-MIASS-AS MTS PJSC",
+   "class": "consumer_isp"
+  },
+  "56917": {
+   "name": "DALTECH-AS DalTech Ltd",
+   "class": "unclassified"
+  },
+  "57378": {
+   "name": "ROSTOV-AS JSC \"ER-Telecom Holding\"",
+   "class": "consumer_isp"
+  },
+  "57396": {
+   "name": "ASIZBERBASH Aliev Magomed Kadievich",
+   "class": "unclassified"
+  },
+  "57803": {
+   "name": "TELESERVIS-AS TeleServis Ltd",
+   "class": "unclassified"
+  },
+  "58096": {
+   "name": "Elit-TV-AS Viter Evgeniy Vasilevich",
+   "class": "unclassified"
+  },
+  "59867": {
+   "name": "OPTILINK-AS Optilink LLC",
+   "class": "unclassified"
+  },
+  "196742": {
+   "name": "EKRAN-AS LLC Ekran",
+   "class": "unclassified"
+  },
+  "198185": {
+   "name": "LIGALINK-AS LigaLink LLC",
+   "class": "unclassified"
+  },
+  "203117": {
+   "name": "mtk MTK LLC",
+   "class": "unclassified"
+  },
+  "203527": {
+   "name": "RADIOSET-AS Filonenko Andrey PE",
+   "class": "unclassified"
+  },
+  "203806": {
+   "name": "granline-as GranLine, Ltd.",
+   "class": "unclassified"
+  },
+  "204833": {
+   "name": "VTEL-NSK-AS Vostok Telecom LLC",
+   "class": "unclassified"
+  },
+  "205439": {
+   "name": "ippark-as IP PARK LLC",
+   "class": "unclassified"
+  },
+  "208435": {
+   "name": "ZUGRES-NET Zverkov Sergey Aleksandrovich PE",
+   "class": "unclassified"
+  },
+  "209059": {
+   "name": "GCOM-AS G COM Ltd.",
+   "class": "unclassified"
+  },
+  "216363": {
+   "name": "istra-dot-net-as OOO Istra.net",
+   "class": "unclassified"
+  },
+  "208729": {
+   "name": "KOZITSKIY-AM Kozitskiy A.M. PI",
+   "class": "unclassified"
+  }
+ }
+}
