@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the Lokhotron sensor battery periodically (jittered, gentle)
+Description=Periodic network path measurement (jittered)
 
 [Timer]
 OnBootSec=1min

@@ -244,8 +244,18 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
   third state (`exit 2`, "cannot judge") became `not_evaluated` (contract 0.2). Its byte-level
   properties were checked and don't transfer (they describe zapret2's dissector, not the TSPU).
   Further pulls stay one-way and non-blocking; dpi-bench is a separate session.
-- Name invariant: "Lokhotron"/лохотрон never appears in any client-facing artifact or contract
-  payload that reaches the client. Safe only because the trust boundary keeps it censor-facing.
+- Name invariant, **two rules, both binding**:
+  1. *Client-facing* — "Lokhotron"/лохотрон never appears in any client-facing artifact or
+     contract payload that reaches the client. Safe only because the trust boundary keeps it
+     censor-facing.
+  2. *RU-facing* — and it appears on no RU sensor either: not in a path, binary, systemd unit,
+     hostname, or a left-behind clone. The name is a **link** from the box to the public repo,
+     and the repo is the publishing layer that `deploy/LEGAL-RU.md` rates as carrying the real
+     Russian exposure; the sensing layer is low-risk only while the two stay separable.
+     Enforced by `LOK_PREFIX` in the deploy scripts (default `netmon`), not by memory —
+     `sensor-setup.sh` rejects a prefix naming the project and prints the `rm -rf` for the
+     clone as its last line. LEGAL-RU.md item 5 previously asserted this rule while citing
+     STATUS.md, which only stated rule 1; that gap is closed — in the tooling, not just prose.
 
 ## Next actions
 

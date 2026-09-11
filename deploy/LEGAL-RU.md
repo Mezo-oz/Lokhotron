@@ -143,7 +143,12 @@ number.
 4. **Confirm the hard rule holds in the deployed config:** every probe target is a host you own.
    Check `lokhotron-sensor.env` before enabling the timer.
 5. **Keep the name invariant** — "Lokhotron"/лохотрон appears on no RU-facing infrastructure,
-   hostname, or payload (already in STATUS.md).
+   hostname, payload, or working tree. Not cosmetic: the name links the box to the public repo,
+   and the repo is the publishing layer that carries the exposure this whole document is about.
+   The deploy scripts enforce it via `LOK_PREFIX` rather than leaving it to memory — see
+   [DEPLOY.md](DEPLOY.md) "The name invariant". Note this is *broader* than the client-facing
+   rule in STATUS.md, which binds only artifacts that reach a client; both now stand, and
+   STATUS.md records both.
 6. **Assume the published findings get blocked in Russia,** and keep the client tree separate so a
    designation against the publishing side does not reach the client's trust anchor.
 7. **If you may travel to Russia or a jurisdiction with a close law-enforcement relationship to it,

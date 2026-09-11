@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One battery run: check the instrument is alive, probe the server, stamp + tag the verdict,
-# append to the local JSONL. Invoked by lokhotron-sensor.service (timer-driven). Tags are
+# append to the local JSONL. Invoked by the sensor .service (timer-driven). Tags are
 # coarse {asn, region} only — no user identifier, no precise location (CONTRACT.md Part 2).
 #
 # Two kinds of row come out of here, and the whole point of this file is to never confuse them:
@@ -24,10 +24,13 @@
 # Don't add a "ping something else" check here — third-party probing is the legal line.
 set -uo pipefail   # no -e: every failure below is handled, and every run writes exactly one row
 
-# Overridable so the gate itself can be tested (rig/, or by hand) without touching /etc or /var.
-LOG="${LOK_BATTERY_LOG:-/var/log/lokhotron/battery.jsonl}"
-ENV_FILE="${LOK_SENSOR_ENV:-/etc/lokhotron/sensor.env}"
-PROBE="${LOK_PROBE_BIN:-/usr/local/bin/lokhotron-probe}"
+# Installed paths are namespaced by LOK_PREFIX, which the .service sets. The project name is
+# never on disk on a sensor — see DEPLOY.md "The name invariant". Each path stays individually
+# overridable so the gate itself can be tested (rig/, or by hand) without touching /etc or /var.
+LOK_PREFIX="${LOK_PREFIX:-netmon}"
+LOG="${LOK_BATTERY_LOG:-/var/log/$LOK_PREFIX/battery.jsonl}"
+ENV_FILE="${LOK_SENSOR_ENV:-/etc/$LOK_PREFIX/sensor.env}"
+PROBE="${LOK_PROBE_BIN:-/usr/local/bin/$LOK_PREFIX-probe}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-120}"   # seconds; well above the probe's own socket timeouts
 
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

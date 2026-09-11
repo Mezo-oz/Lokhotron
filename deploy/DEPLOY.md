@@ -53,7 +53,11 @@ blindness. That two-sided honesty is what you're buying with the $10 and the ris
    A VPS under your own name is lower human-risk than a volunteer's device, but it is still your
    call to accept. Don't skip this step, and don't rent under false details.
 3. **A port.** One UDP+TCP port for the echo server (default `47017`). Open it in the host
-   firewall **and** the provider security group.
+   firewall **and** the provider security group. **Point sensors at a bare IPv4 literal, not a
+   hostname.** Everything below the socket is IPv4 (`lok-capture` parses IPv4 headers; both
+   probes bind `0.0.0.0`), so on a dual-stack sensor a name whose AAAA sorts first under RFC
+   6724 is refused outright rather than measured half-way — a deliberate `not_evaluated`, but
+   still a run you did not get.
 4. **How you carry the shared secret to each sensor.** The server and every sensor hold the same
    64-hex `LOK_PROBE_KEY`; `server-setup.sh` generates one if you don't supply it. It is what makes
    an arrival provable — without it an on-path device can reflect the probe's own datagrams and the
@@ -66,23 +70,56 @@ The scripts don't decide any of these — you pass them in.
 
 ---
 
+## The name invariant (the tooling enforces this — you do not have to remember it)
+
+Nothing this directory installs carries the project name. Every installed path, binary and
+systemd unit is namespaced by **`LOK_PREFIX`** (default `netmon`), and `sensor-setup.sh`
+refuses a value that names the project.
+
+The reason is narrow and worth stating exactly. The name on a sensor is not embarrassing, it is
+**linking**: *лохотрон* on a Moscow box ties that box to the public repo, and the repo is the
+**publishing** layer — the one [LEGAL-RU.md](LEGAL-RU.md) rates as carrying the real Russian
+exposure, under the March 2024 ban on disseminating circumvention information. The sensing layer
+is low-risk precisely because it is separable from the publishing layer; a hostname, a unit file
+or a stray clone that names the project welds them back together.
+
+So, on the RU sensor:
+
+```sh
+sudo LOK_PREFIX=netmon LOK_PROBE_KEY=<64 hex> deploy/sensor-setup.sh <server-ip>:47017
+```
+
+installs `/usr/local/bin/netmon-probe`, `/etc/netmon/sensor.env`, `/var/log/netmon/battery.jsonl`
+and `netmon-sensor.{service,timer}` — unit `Description=` lines included. Pick your own prefix if
+you prefer; keep it boring and plausible for a VPS.
+
+**The one leak the prefix cannot reach is the working tree.** `git clone` puts STATUS.md,
+LEGAL-RU.md and `writeups/` on the sensor — far more linking material than a unit name. Clone into
+a neutral directory and delete it once provisioning succeeds; `sensor-setup.sh` prints the exact
+`rm -rf` as its last line. The installed binary and units do not need the repo.
+
+This binds the **sensor**. The non-RU echo server is not RU-facing and carries no such exposure,
+but `server-setup.sh` honours the same `LOK_PREFIX` so there is only one convention to remember.
+
+---
+
 ## Non-RU server
 
 On a clone of this repo on the box:
 
 ```sh
 git clone https://github.com/Mezo-oz/Lokhotron && cd Lokhotron
-sudo deploy/server-setup.sh 0.0.0.0:47017
+sudo LOK_PREFIX=netmon deploy/server-setup.sh 0.0.0.0:47017
 ```
 
-Installs cargo if needed, builds `echo-server` (release), installs it as `lokhotron-echo`, runs it
+Installs cargo if needed, builds `echo-server` (release), installs it as `<prefix>-echo`, runs it
 under systemd (`DynamicUser`, hardened), and best-effort opens the port. It also **generates the
-shared secret** into `/etc/lokhotron/echo.env` (0600) and prints it once — that value goes to every
+shared secret** into `/etc/<prefix>/echo.env` (0600) and prints it once — that value goes to every
 sensor. Supply your own instead with `sudo LOK_PROBE_KEY=<64 hex> deploy/server-setup.sh ...`;
 re-running keeps the installed key rather than rotating it out from under live sensors. Verify:
 
 ```sh
-systemctl status lokhotron-echo
+systemctl status netmon-echo
 ss -lunp | grep 47017     # UDP listener
 ```
 
@@ -91,8 +128,9 @@ ss -lunp | grep 47017     # UDP listener
 On a clone of this repo on the box:
 
 ```sh
-git clone https://github.com/Mezo-oz/Lokhotron && cd Lokhotron
-sudo LOK_PROBE_KEY=<the server's 64-hex key> \
+# Clone into a neutral directory — see "The name invariant" above — and delete it when done.
+git clone https://github.com/Mezo-oz/Lokhotron /tmp/build && cd /tmp/build
+sudo LOK_PREFIX=netmon LOK_PROBE_KEY=<the server's 64-hex key> \
     deploy/sensor-setup.sh <non-ru-server-ip>:47017 600 8
 #                           \_______server_______/  \__/ \_/
 #                                                 interval count(datagrams)
@@ -107,9 +145,10 @@ out here costs a minute; sorting them out later means discovering that a week of
 Then **fill in the box's tags** (meaningless data until you do):
 
 ```sh
-sudoedit /etc/lokhotron/sensor.env    # set ASN= and REGION=
-sudo systemctl start lokhotron-sensor.service   # one run now
-tail -f /var/log/lokhotron/battery.jsonl
+sudoedit /etc/netmon/sensor.env    # set ASN= and REGION=
+sudo systemctl start netmon-sensor.service   # one run now
+tail -f /var/log/netmon/battery.jsonl
+cd / && rm -rf /tmp/build          # the clone is the biggest name leak on the box
 ```
 
 Each line is one tagged verdict:

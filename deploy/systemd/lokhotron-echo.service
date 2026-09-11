@@ -1,5 +1,5 @@
 [Unit]
-Description=Lokhotron echo server (reverse-measurement endpoint)
+Description=Network path echo responder
 After=network-online.target
 Wants=network-online.target
 
@@ -7,8 +7,8 @@ Wants=network-online.target
 # The shared secret. systemd reads this as root before dropping to the dynamic user, so the
 # file stays 0600 root-owned. Without it the server runs in open mode and will answer
 # anyone — see lok-wire's module docs on why that matters on a public IP.
-EnvironmentFile=/etc/lokhotron/echo.env
-ExecStart=/usr/local/bin/lokhotron-echo __LISTEN__
+EnvironmentFile=/etc/__PREFIX__/echo.env
+ExecStart=/usr/local/bin/__PREFIX__-echo __LISTEN__
 Restart=always
 RestartSec=2
 # Port is >1024, so no privileges needed — run as a throwaway dynamic user, hardened.

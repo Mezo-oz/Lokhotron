@@ -16,10 +16,17 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # --- shared secret ----------------------------------------------------------
 # Keep an already-installed key rather than rotating it out from under live sensors.
-if [ -f /etc/lokhotron/echo.env ] && [ -z "${LOK_PROBE_KEY:-}" ]; then
+# Same namespace the sensors use, so the pair stays symmetric and the operator types one
+# name everywhere. The invariant it exists for binds the RU side (DEPLOY.md "The name
+# invariant"); applying it here too means there is no second convention to remember.
+LOK_PREFIX="${LOK_PREFIX:-netmon}"
+[[ "$LOK_PREFIX" =~ ^[a-z][a-z0-9-]{1,30}$ ]] \
+    || { echo "LOK_PREFIX must match ^[a-z][a-z0-9-]{1,30}$ (got '$LOK_PREFIX')"; exit 1; }
+
+if [ -f "/etc/$LOK_PREFIX/echo.env" ] && [ -z "${LOK_PROBE_KEY:-}" ]; then
     # shellcheck disable=SC1091
-    LOK_PROBE_KEY="$(sed -n 's/^LOK_PROBE_KEY=//p' /etc/lokhotron/echo.env)"
-    echo "kept the existing key in /etc/lokhotron/echo.env"
+    LOK_PROBE_KEY="$(sed -n 's/^LOK_PROBE_KEY=//p' "/etc/$LOK_PREFIX/echo.env")"
+    echo "kept the existing key in /etc/$LOK_PREFIX/echo.env"
 fi
 if [ -z "${LOK_PROBE_KEY:-}" ]; then
     LOK_PROBE_KEY="$(head -c32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
@@ -29,10 +36,10 @@ case "$LOK_PROBE_KEY" in
     [0-9a-fA-F]*) [ "${#LOK_PROBE_KEY}" -eq 64 ] || { echo "LOK_PROBE_KEY must be 64 hex chars"; exit 1; } ;;
     *) echo "LOK_PROBE_KEY must be 64 hex chars"; exit 1 ;;
 esac
-mkdir -p /etc/lokhotron
+mkdir -p "/etc/$LOK_PREFIX"
 umask 077
-printf 'LOK_PROBE_KEY=%s\n' "$LOK_PROBE_KEY" > /etc/lokhotron/echo.env
-chmod 0600 /etc/lokhotron/echo.env
+printf 'LOK_PROBE_KEY=%s\n' "$LOK_PROBE_KEY" > "/etc/$LOK_PREFIX/echo.env"
+chmod 0600 "/etc/$LOK_PREFIX/echo.env"
 
 # --- deps: a Rust toolchain -------------------------------------------------
 ensure_cargo() {
@@ -49,13 +56,14 @@ ensure_cargo
 
 # --- build + install --------------------------------------------------------
 ( cd "$REPO_ROOT" && cargo build --release -p echo-server )
-install -m0755 "$REPO_ROOT/target/release/echo-server" /usr/local/bin/lokhotron-echo
+install -m0755 "$REPO_ROOT/target/release/echo-server" "/usr/local/bin/$LOK_PREFIX-echo"
 
 # --- systemd service --------------------------------------------------------
-sed "s|__LISTEN__|$LISTEN|g" "$REPO_ROOT/deploy/systemd/lokhotron-echo.service" \
-    > /etc/systemd/system/lokhotron-echo.service
+sed "s|__LISTEN__|$LISTEN|g; s|__PREFIX__|$LOK_PREFIX|g" "$REPO_ROOT/deploy/systemd/lokhotron-echo.service" \
+    > "/etc/systemd/system/$LOK_PREFIX-echo.service"
+chmod 0644 "/etc/systemd/system/$LOK_PREFIX-echo.service"
 systemctl daemon-reload
-systemctl enable --now lokhotron-echo.service
+systemctl enable --now "$LOK_PREFIX-echo.service"
 
 # --- firewall (best-effort; the provider security group still matters) ------
 open_port() {
@@ -69,7 +77,7 @@ open_port() {
 }
 open_port
 
-echo "OK: lokhotron-echo listening on $LISTEN (udp+tcp). Status: systemctl status lokhotron-echo"
+echo "OK: $LOK_PREFIX-echo listening on $LISTEN (udp+tcp). Status: systemctl status $LOK_PREFIX-echo"
 if [ -n "${GENERATED:-}" ]; then
     echo
     echo "Generated the shared secret. Every sensor needs this exact value:"
