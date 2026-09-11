@@ -102,8 +102,17 @@ impl Key {
     /// detection still works with it — that only needs both ends to agree. **Forgery
     /// detection does not**: anyone can compute these tags. A run made with this key
     /// reports `keyed: false` so a verdict is never read as stronger than it is.
+    ///
+    /// The domain tag says `lok/`, not the project name, and that is load-bearing rather
+    /// than cosmetic: this literal is compiled into the probe, so the old spelling meant
+    /// `strings /usr/local/bin/<prefix>-probe` on an RU sensor printed the project name.
+    /// That is the one place the `LOK_PREFIX` namespacing cannot reach, and it defeats the
+    /// invariant for the same reason — the name links the box to the public repo. Bumped
+    /// v2 -> v3 because the derived key changes with the tag: an old and a new binary will
+    /// not agree in open mode, and a version bump makes that a clean mismatch rather than a
+    /// silent one. Keyed runs are unaffected; they never derive from this.
     pub fn open() -> Key {
-        Key { bytes: sha256::sha256(&[b"lokhotron/open-mode/v2"]), keyed: false }
+        Key { bytes: sha256::sha256(&[b"lok/open-mode/v3"]), keyed: false }
     }
 
     /// Parse 64 hex characters into a key. `None` on any other shape — a truncated or
