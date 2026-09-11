@@ -50,12 +50,31 @@ pub fn key_from_env() -> Key {
     }
 }
 
-fn resolve(addr: &str) -> Option<SocketAddr> {
-    addr.to_socket_addrs().ok()?.next()
+/// Pick the IPv4 endpoint out of whatever `getaddrinfo` returned. Split out from
+/// [`resolve`] so the preference itself is testable without DNS.
+fn first_v4(addrs: impl Iterator<Item = SocketAddr>) -> Option<SocketAddr> {
+    addrs.into_iter().find(SocketAddr::is_ipv4)
 }
 
-/// The peer's IPv4 address and port, for building a capture [`FlowFilter`]. `None` for a
-/// name that resolves to IPv6 — the capture path models IPv4 only today.
+/// Resolve `addr` to an **IPv4** endpoint, never whatever came back first.
+///
+/// Everything below the socket here is IPv4: [`lok_capture`] parses IPv4 headers only, and
+/// both probes bind `0.0.0.0`. So on a dual-stack sensor the order `getaddrinfo` returns is
+/// not a neutral detail — RFC 6724 puts the AAAA first, and taking `.next()` handed the TCP
+/// arm a V6 address it could not use. The failure was silent and one-sided:
+/// `CapturingTcpProbe` returned `reachable: false`, so the RST capture never opened,
+/// `measure_throughput` was skipped (it is gated on reachability), and
+/// `calibrate_control_ttl` fell back to the assumed constant the per-route calibration
+/// exists to replace. The run still printed `ok` — a week of rows that *cannot* contain
+/// `injected_rst_at_sni` or `throttle_to_rate`, which is the false null the calibration was
+/// bought to prevent. A name with no A record returns `None` and is caught by the gate in
+/// [`probe_battery_with`] rather than measured half-way.
+fn resolve(addr: &str) -> Option<SocketAddr> {
+    first_v4(addr.to_socket_addrs().ok()?)
+}
+
+/// The peer's IPv4 address and port, for building a capture [`FlowFilter`]. `None` only when
+/// the name has no IPv4 address at all — [`resolve`] already skips past any AAAA.
 fn peer_v4(addr: &str) -> Option<([u8; 4], u16)> {
     match resolve(addr)? {
         SocketAddr::V4(v4) => Some((v4.ip().octets(), v4.port())),
@@ -507,6 +526,19 @@ pub fn probe_battery_with(
     control_ttl: u8,
     key: Key,
 ) -> std::io::Result<Observation> {
+    // Refuse the run rather than measure half of it. With no IPv4 for a target the TCP arm
+    // would report `reachable: false` and the capture would never open, which classifies as
+    // a *finding* about the far end instead of an outage on this end. Erroring here exits
+    // non-zero, which `deploy/run-battery.sh` files as `not_evaluated/probe_error`.
+    for (arm, addr) in [("udp", udp_addr), ("tcp", tcp_addr)] {
+        if resolve(addr).is_none() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AddrNotAvailable,
+                format!("{arm} target {addr}: no IPv4 address (the capture path is IPv4-only)"),
+            ));
+        }
+    }
+
     let mut obs = probe_once_with_key(udp_addr, count, key)?;
     let res = tcp.run(tcp_addr, control_ttl);
     obs.tcp_reachable = res.reachable;
@@ -519,4 +551,35 @@ pub fn probe_battery_with(
         }
     }
     Ok(obs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sa(s: &str) -> SocketAddr {
+        s.parse().unwrap()
+    }
+
+    /// The regression that motivated this: on a dual-stack sensor RFC 6724 puts the AAAA
+    /// first, and the old `.next()` handed the IPv4-only capture path a V6 address.
+    /// Addresses are the RFC 3849 / RFC 5737 documentation ranges on purpose — a real sensor
+    /// address in a public repo is a target list.
+    #[test]
+    fn resolution_skips_a_leading_v6_for_the_v4_the_capture_can_parse() {
+        let addrs = vec![sa("[2001:db8::1]:47017"), sa("192.0.2.10:47017")];
+        assert_eq!(first_v4(addrs.into_iter()), Some(sa("192.0.2.10:47017")));
+    }
+
+    #[test]
+    fn resolution_is_none_when_there_is_no_v4_at_all() {
+        let addrs = vec![sa("[2001:db8::1]:47017"), sa("[2001:db8::2]:47017")];
+        assert_eq!(first_v4(addrs.into_iter()), None);
+    }
+
+    #[test]
+    fn a_v4_only_answer_is_unchanged() {
+        let addrs = vec![sa("127.0.0.1:47017")];
+        assert_eq!(first_v4(addrs.into_iter()), Some(sa("127.0.0.1:47017")));
+    }
 }

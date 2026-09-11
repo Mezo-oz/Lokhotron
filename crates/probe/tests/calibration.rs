@@ -326,3 +326,24 @@ fn the_server_does_not_answer_unauthenticated_traffic() {
     let obs = probe_once_with_key(&addr, 4, test_key()).expect("probe run");
     assert_eq!(obs.highest_marker_arrived, Some(3));
 }
+
+/// A v6-only target must be an outage, not a measurement. Everything below the socket is
+/// IPv4, so a run that cannot reach the peer on v4 would otherwise report `reachable: false`
+/// with no capture and no throughput — a censorship-shaped row produced by our own stack.
+/// The non-zero exit this produces is what `deploy/run-battery.sh` turns into
+/// `not_evaluated/probe_error`.
+#[test]
+fn a_target_with_no_ipv4_is_an_error_not_a_verdict() {
+    let err = probe_battery("[::1]:47017", "[::1]:47017", 4).expect_err("must refuse to run");
+    assert_eq!(err.kind(), std::io::ErrorKind::AddrNotAvailable);
+    assert!(err.to_string().contains("no IPv4 address"), "got: {err}");
+}
+
+/// And the gate names the arm that failed, so the journal says which half of the battery is
+/// misconfigured rather than just that something did not resolve.
+#[test]
+fn the_gate_fires_on_the_tcp_arm_alone() {
+    let udp = spawn_udp_echo(FaultPolicy::None);
+    let err = probe_battery(&udp, "[::1]:47017", 4).expect_err("must refuse to run");
+    assert!(err.to_string().starts_with("tcp target"), "got: {err}");
+}
