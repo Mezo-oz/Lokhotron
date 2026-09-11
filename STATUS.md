@@ -187,9 +187,9 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
 | RU legal / sanctions check | **Done** — [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md). Research pass, not advice; re-read at rent time. |
 | Provider screen (OFAC + OONI) | **Done** — [phase0/PROVIDER-SHORTLIST.md](phase0/PROVIDER-SHORTLIST.md). 22 candidates; Aeza designated; 3 suggested spanning path profiles. |
-| Provision + live run | **NEXT — operator step.** Everything upstream is unblocked; see the runbook below. |
+| Provision + live run | **RUNNING since 2026-09-11.** Non-RU echo server and one RU sensor both live; battery every 600s (+-120s jitter), first rows all `ok`. Rig re-verified 8/8 against this code. |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | **Done (first read).** `phase0/ooni_gap.py` + [FINDINGS-2026-08-27](phase0/FINDINGS-2026-08-27.md). The gap is real but **provider-specific**, not a constant — which turned provider choice into a measurement decision. |
-| Phase 1 (2 VPS + live probe battery + echo delta) | Not started. Honest claim scoped to the **DC path** until a consumer vantage exists. |
+| Phase 1 (2 VPS + live probe battery + echo delta) | **Collecting.** One RU sensor, not the 2-3 the provider spread argues for — so no cross-provider comparison yet. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
 | Phase 3 (client-as-sensor fusion — the only clean gap-closer) | Not started. |
 
@@ -256,6 +256,21 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
      `sensor-setup.sh` rejects a prefix naming the project and prints the `rm -rf` for the
      clone as its last line. LEGAL-RU.md item 5 previously asserted this rule while citing
      STATUS.md, which only stated rule 1; that gap is closed — in the tooling, not just prose.
+
+## Live run status (2026-09-11)
+
+The pair is up and the battery is collecting. What is verified, and what is not:
+
+- **Verified.** Keyed batteries complete end to end; verdicts carry `asn`/`region`; the timer
+  fires on schedule with no `not_evaluated` rows and no failed units. The sensor's ASN was
+  confirmed against Team Cymru rather than assumed from the plan, which DEPLOY.md warns about.
+- **Not verified.** A single sensor cannot test Correction 3 — the 87-96 pp spread *between* RU
+  hosting providers is the load-bearing Phase 0 result, and one box cannot be called
+  representative. Two more sensors at different providers is the next real step.
+- **Read the early `ok` rows narrowly.** They say a keyed UDP+TCP echo path completed. They do
+  **not** say "no TSPU": website-SNI blocking and VPN-protocol shaping are different mechanisms,
+  and the transport battery is what probes the second. One row carries `"asn":0` from before the
+  tags were set — exclude `asn:0` from every rate.
 
 ## Next actions
 
