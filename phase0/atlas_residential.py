@@ -75,7 +75,8 @@ def get(path: str, key: str | None = None) -> dict:
         return json.load(r)
 
 
-def build(target: str, n: int, port: int, only: list[str] | None = None) -> dict:
+def build(target: str, n: int, port: int, only: list[str] | None = None,
+          sni: str | None = None) -> dict:
     # `nat` biases probe selection toward RFC1918-behind-NAT hosts, which is the practical
     # marker of a home connection rather than a rack. It is a bias, not a guarantee -- record
     # the probe ASNs from the results and classify properly at analysis time.
@@ -83,15 +84,28 @@ def build(target: str, n: int, port: int, only: list[str] | None = None) -> dict
     # the same linking argument as the name invariant in DEPLOY.md. Atlas also rejects several
     # punctuation characters in them, arrows included.
     probes = [{"type": "country", "value": "RU", "requested": n, "tags": {"include": ["nat"]}}]
+    # sslcert always dials our IP:port. `hostname` is the name the probe writes into the
+    # ClientHello's SNI extension -- the plaintext field a DPI box reads to decide whether to
+    # reset the flow. With no --sni we send none, so nothing on the path has a name to react to
+    # and the run measures only baseline reachability + cert integrity. With --sni set to a name
+    # RU is known to filter, a reset that appears only when the name is present -- while the
+    # no-SNI run to the same IP succeeds -- is injected_rst_at_sni, observed from a consumer
+    # vantage. Our server ignores SNI and always serves the one self-signed cert, so any
+    # difference in outcome is the path's doing, not ours. NB: the SNI value is PUBLIC on the
+    # Atlas measurement page, same as the description.
+    sslcert = {
+        "type": "sslcert",
+        "af": 4,
+        "target": target,
+        "port": port,
+        "description": "RU residential vantage to own host, TLS handshake",
+        "is_oneoff": True,
+    }
+    if sni:
+        sslcert["hostname"] = sni
+        sslcert["description"] = "RU residential vantage to own host, TLS handshake with SNI"
     defs = [
-            {
-                "type": "sslcert",
-                "af": 4,
-                "target": target,
-                "port": port,
-                "description": "RU residential vantage to own host, TLS handshake",
-                "is_oneoff": True,
-            },
+            sslcert,
             {
                 "type": "traceroute",
                 "af": 4,
@@ -123,6 +137,12 @@ def main() -> None:
     ap.add_argument("--only", nargs="*", choices=["sslcert", "traceroute", "ping"],
                     help="run only these types. sslcert needs a TLS listener on --port; without "
                          "one every probe fails for a boring reason and reads exactly like a block.")
+    ap.add_argument("--sni", metavar="HOSTNAME",
+                    help="name to put in the sslcert ClientHello's SNI extension. Omit for a "
+                         "baseline run (no SNI). Set it to a name RU is known to filter to test "
+                         "injected_rst_at_sni: a reset that appears only with the name present, "
+                         "against the same IP a no-SNI run reaches, is a path-side SNI block. "
+                         "PUBLIC on the Atlas measurement page.")
     ap.add_argument("--dry-run", action="store_true", help="print the request and the credit cost")
     ap.add_argument("--results", metavar="MSM_ID", help="fetch results for a measurement id")
     args = ap.parse_args()
@@ -134,7 +154,7 @@ def main() -> None:
             print(json.dumps(r)[:400])
         return
 
-    body = build(args.target, args.probes, args.port, args.only)
+    body = build(args.target, args.probes, args.port, args.only, args.sni)
 
     if args.dry_run:
         print(json.dumps(body, indent=2))
