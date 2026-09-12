@@ -17,6 +17,10 @@ What it can do, and why each earns its place:
   sslcert   -- a full TLS handshake to our own host. An SNI-triggered reset or a substituted
                certificate shows up directly, from a consumer vantage. This is the closest
                thing to the `injected_rst_at_sni` question that Atlas can answer.
+               REQUIRES A TLS LISTENER on --port. Without one every probe fails to connect,
+               which is indistinguishable from a block and would be read as one -- the same
+               not_evaluated-vs-timeout_indistinct trap the battery exists to avoid. Check
+               the port answers from a clean vantage BEFORE pointing probes at it.
   traceroute-- shows *where* on the path a probe dies, which separates "blocked near the
                user" from "blocked at the border" -- a distinction the DC boxes cannot make.
   ping      -- cheap reachability baseline to interpret the other two against.
@@ -71,19 +75,21 @@ def get(path: str, key: str | None = None) -> dict:
         return json.load(r)
 
 
-def build(target: str, n: int, port: int) -> dict:
+def build(target: str, n: int, port: int, only: list[str] | None = None) -> dict:
     # `nat` biases probe selection toward RFC1918-behind-NAT hosts, which is the practical
     # marker of a home connection rather than a rack. It is a bias, not a guarantee -- record
     # the probe ASNs from the results and classify properly at analysis time.
+    # Descriptions are PUBLIC on the Atlas measurement page, so they carry no project name --
+    # the same linking argument as the name invariant in DEPLOY.md. Atlas also rejects several
+    # punctuation characters in them, arrows included.
     probes = [{"type": "country", "value": "RU", "requested": n, "tags": {"include": ["nat"]}}]
-    return {
-        "definitions": [
+    defs = [
             {
                 "type": "sslcert",
                 "af": 4,
                 "target": target,
                 "port": port,
-                "description": "RU residential -> our host: TLS handshake (SNI-block check)",
+                "description": "RU residential vantage to own host, TLS handshake",
                 "is_oneoff": True,
             },
             {
@@ -91,20 +97,22 @@ def build(target: str, n: int, port: int) -> dict:
                 "af": 4,
                 "target": target,
                 "protocol": "ICMP",
-                "description": "RU residential -> our host: where does the path die",
+                "description": "RU residential vantage to own host, path trace",
                 "is_oneoff": True,
             },
             {
                 "type": "ping",
                 "af": 4,
                 "target": target,
-                "description": "RU residential -> our host: reachability baseline",
+                "description": "RU residential vantage to own host, reachability baseline",
                 "is_oneoff": True,
             },
-        ],
-        "probes": probes,
-        "is_oneoff": True,
-    }
+    ]
+    if only:
+        defs = [d for d in defs if d["type"] in only]
+        if not defs:
+            sys.exit("--only matched no measurement type")
+    return {"definitions": defs, "probes": probes, "is_oneoff": True}
 
 
 def main() -> None:
@@ -112,6 +120,9 @@ def main() -> None:
     ap.add_argument("--target", required=True, help="a host WE OWN (the echo server)")
     ap.add_argument("--probes", type=int, default=25)
     ap.add_argument("--port", type=int, default=443, help="sslcert port; 443 unless you moved it")
+    ap.add_argument("--only", nargs="*", choices=["sslcert", "traceroute", "ping"],
+                    help="run only these types. sslcert needs a TLS listener on --port; without "
+                         "one every probe fails for a boring reason and reads exactly like a block.")
     ap.add_argument("--dry-run", action="store_true", help="print the request and the credit cost")
     ap.add_argument("--results", metavar="MSM_ID", help="fetch results for a measurement id")
     args = ap.parse_args()
@@ -123,17 +134,17 @@ def main() -> None:
             print(json.dumps(r)[:400])
         return
 
-    body = build(args.target, args.probes, args.port)
+    body = build(args.target, args.probes, args.port, args.only)
 
     if args.dry_run:
         print(json.dumps(body, indent=2))
-        print("\n3 one-off measurements x %d probes." % args.probes)
+        print("\n%d one-off measurement(s) x %d probes." % (len(body["definitions"]), args.probes))
         print("Nothing was sent. Drop --dry-run to create them.")
         return
 
     if not key:
-        sys.exit("set ATLAS_API_KEY (atlas.ripe.net -> profile -> API keys, "
-                 "permission: create a new user-defined measurement)")
+        sys.exit("set ATLAS_API_KEY -- atlas.ripe.net/dashboard/ -> 'My API Keys' -> + -> "
+                 "Add Grant -> permission 'Schedule a new measurement', target 'all'")
 
     try:
         me = get("/credits/", key)
