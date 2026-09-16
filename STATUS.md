@@ -1,7 +1,10 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-09-09 (transport enum reconciled against
+> or an open question closes. Last updated: 2026-09-16 (first measured Phase 1 read: 641/641
+> keyed batteries `ok` over ~5 days, zero timer misses; the TSPU question narrowed but **not**
+> closed; the Atlas sslcert target was found wedged, which blocks the residential run until
+> fixed — see *Live run status*). Prior: 2026-09-09 (transport enum reconciled against
 > amnezia-client; screens re-run same-day — shortlist unchanged and clear to rent, but the
 > **telegram gap flipped sign**, so Correction 3's sign-flip property does not hold this month).
 > Prior: 2026-09-01 (re-ran both pre-spend screens — runbook
@@ -175,7 +178,7 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Phase | State |
 |---|---|
 | Design | **Done** — DESIGN + CONTRACT + ECHO + this file committed. |
-| Phase 1 **step 0** (calibration harness) | **Built + green** — 49 tests pass, clippy clean. |
+| Phase 1 **step 0** (calibration harness) | **Built + green** — 53 tests pass, clippy clean. |
 | Phase 1 TCP increment (real reachability + throughput) | **Done + green.** |
 | Wire `watch_for_rst` into `probe_battery` (on-wire `injected_rst`) | **Done + verified on the wire** (rig, root). |
 | Per-route control-TTL calibration | **Done + verified** — RST judged against measured ~64, not assumed. |
@@ -187,9 +190,9 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
 | Repeatable deploy for the VPS pair (`deploy/`) | **Built** — provider-agnostic setup scripts + systemd units + `DEPLOY.md`. Not yet run on real hosts. |
 | RU legal / sanctions check | **Done** — [deploy/LEGAL-RU.md](deploy/LEGAL-RU.md). Research pass, not advice; re-read at rent time. |
 | Provider screen (OFAC + OONI) | **Done** — [phase0/PROVIDER-SHORTLIST.md](phase0/PROVIDER-SHORTLIST.md). 22 candidates; Aeza designated; 3 suggested spanning path profiles. |
-| Provision + live run | **RUNNING since 2026-09-11.** Non-RU echo server and one RU sensor both live; battery every 600s (+-120s jitter), first rows all `ok`. Rig re-verified 8/8 against this code. |
+| Provision + live run | **RUNNING since 2026-09-11.** Non-RU echo server and one RU sensor both live; battery every 600-720s (`OnUnitActiveSec=600` + `RandomizedDelaySec=120`, ~129 runs/day). **641/641 attributed rows `ok`** through 2026-09-16 20:09 UTC, no gaps. Rig re-verified 8/8 against this code. |
 | Phase 0 (kept, narrowed: OONI-residential vs DC-VPS reachability diff = recruitment-free gap read) | **Done (first read).** `phase0/ooni_gap.py` + [FINDINGS-2026-08-27](phase0/FINDINGS-2026-08-27.md). The gap is real but **provider-specific**, not a constant — which turned provider choice into a measurement decision. |
-| Phase 1 (2 VPS + live probe battery + echo delta) | **Collecting.** One RU sensor, not the 2-3 the provider spread argues for — so no cross-provider comparison yet. Honest claim scoped to the **DC path** until a consumer vantage exists. |
+| Phase 1 (2 VPS + live probe battery + echo delta) | **Collecting** (5 days, all `ok` — see *Live run status* for what that does and does not mean). One RU sensor, not the 2-3 the provider spread argues for — so no cross-provider comparison yet. Honest claim scoped to the **DC path** until a consumer vantage exists. |
 | Phase 2 (analysis + signed bundle push) | Not started. |
 | Phase 3 (client-as-sensor fusion — the only clean gap-closer) | Not started. |
 
@@ -257,20 +260,90 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
      clone as its last line. LEGAL-RU.md item 5 previously asserted this rule while citing
      STATUS.md, which only stated rule 1; that gap is closed — in the tooling, not just prose.
 
-## Live run status (2026-09-11)
+## Live run status (2026-09-16)
 
-The pair is up and the battery is collecting. What is verified, and what is not:
+Measured from the sensor's own `battery.jsonl` (pulled read-only), not from the first-night rows.
 
-- **Verified.** Keyed batteries complete end to end; verdicts carry `asn`/`region`; the timer
-  fires on schedule with no `not_evaluated` rows and no failed units. The sensor's ASN was
-  confirmed against Team Cymru rather than assumed from the plan, which DEPLOY.md warns about.
-- **Not verified.** A single sensor cannot test Correction 3 — the 87-96 pp spread *between* RU
-  hosting providers is the load-bearing Phase 0 result, and one box cannot be called
-  representative. Two more sensors at different providers is the next real step.
-- **Read the early `ok` rows narrowly.** They say a keyed UDP+TCP echo path completed. They do
-  **not** say "no TSPU": website-SNI blocking and VPN-protocol shaping are different mechanisms,
-  and the transport battery is what probes the second. One row carries `"asn":0` from before the
-  tags were set — exclude `asn:0` from every rate.
+### Phase 1, first five days
+
+| | |
+|---|---|
+| Window | 2026-09-11 21:03 → 2026-09-16 20:09 UTC (~119 h) |
+| Rows | 642 total; **1 excluded** (`asn:0`, 21:03:21, logged before the tags were set) |
+| Attributed rows | **641, all `{"kind":"ok"}`** — one ASN, one coarse region, as tagged |
+| Non-`ok` | **0** — no `not_evaluated`, no `timeout_indistinct`, no drop / mutation / throttle / RST verdict, no `stderr` field on any row |
+| Cadence | median 673 s, mean 670 s, max 737 s; ~129 runs/day on full days (128-129) |
+| Timer misses | **none** — no interval over 900 s. One 38 s interval on the first night (21:26→21:27 on 09-11) is a hand-run during provisioning, not a timer fault |
+| Health | sensor timer active/enabled, every run exits 0, no failed units on either box; echo, TLS and Atlas services active since provisioning |
+| Growth | battery log ~10 KB/day (52 KB total, no rotation needed for years); journals 24 MB on the sensor, ~30 MB/day on the echo host (verbose service and firewall logging; no explicit cap, so journald's default of 10% of the disk applies) |
+
+The cadence is `OnUnitActiveSec=600` plus up to 120 s random delay, so intervals run 600-720 s,
+not 600 ± 120. Expect ~129 rows a day, not 144, when checking for gaps.
+
+### What `ok` covers, on this battery
+
+Read off `probe_battery` and `classify`, not assumed. Each `ok` row means all of:
+- 8 keyed UDP datagrams delivered and signed back, none dropped, none rewritten on either leg;
+- the TCP port reachable, with no RST judged anomalous against the TTL measured on this route;
+- a 256 KiB bulk echo over TCP at no less than half the nominal rate. A connection that
+  **freezes** after some KB still reads as `throttle_to_rate`, because the 5 s read stall
+  collapses the measured rate, so a byte-count freeze on this flow would have shown up.
+
+What it does **not** cover, and why "641 × `ok`" is not "no TSPU":
+- **No VPN wire fingerprint is exercised.** The UDP payload is `lok-wire`, not an AmneziaWG /
+  WireGuard / OpenVPN handshake; the observation is only *filed* under `amnezia_wg` as the UDP
+  representative. A box that shapes on protocol signatures has had nothing to recognise.
+- **No TLS, no SNI.** The TCP arm is raw bytes on a non-standard port.
+- **The destination is our own unlisted host.** Nothing on a blocklist, nothing IP-based to hit.
+- **The log stores the verdict only.** Throughput, TTLs and echo counts are discarded, so drift
+  that stays above threshold is invisible. Worth persisting before the log is used for more
+  than a pass/fail read.
+- **Known false-null edge:** if TCP connects but the bulk connection returns **zero** bytes
+  (reset before the first echo), `measure_throughput` returns `None`, no throttle check runs,
+  and the row reads `ok`. Not observed to matter here, but it is an uncalibrated shape. Fix it
+  with a rig case confirmed against the pre-change binary, per the usual rule.
+
+### The TSPU question: narrowed, not closed
+
+Evidence now points one way, and the instrument still cannot settle it:
+- 5 days of clean keyed UDP and TCP with a 256 KiB push, zero anomalies (above);
+- a one-off TLS 1.3 fetch of an RKN-blocked site from the box on 2026-09-10 completed with the
+  real SNI, so **no website-SNI filtering** on that path either;
+- the provider's routing (checked at rent time, recorded privately) gives a concrete reason a
+  box would sit *outside* operator TSPU deployment;
+- against: OONI circumvention-tool failures from the sensor's ASN run well above the non-RU
+  baseline, though at small n and not necessarily on this prefix or path.
+
+**Working hypothesis: this sensor is probably not behind a TSPU, and is best treated as a
+near-clean control rather than as the RU vantage.** It is not a finding yet: the battery has
+never presented a signature a TSPU is known to act on, so "no TSPU" and "a TSPU that ignores
+this traffic class" still look identical. Two things would actually move it: (a) a
+fingerprint-bearing transport in the battery, which is Phase 2 scope, or (b) a second sensor
+at a shortlisted provider whose transit *is* Russian, where the same battery either diverges
+from this one or does not. (b) is the Correction 3 test anyway.
+
+### Residential Atlas run: not ready, blocked on the sslcert listener
+
+- **Probe:** our software probe, connected continuously since 2026-09-12 23:30
+  UTC, IPv4 and IPv6 stable-1d. Probe selection is not a constraint: 140 connected RU probes
+  carry the `nat` tag (586 connected RU probes in all) against 25 requested.
+- **Credits:** not verified. Reading the balance needs an Atlas login or an API key with the
+  credits grant, and neither was available. Estimated from the documented earn rate at
+  ~80k for ~3.9 days connected, against ~2,150 for the full 3-type × 25-probe baseline. Check
+  the dashboard before trusting that figure.
+- **BLOCKER: the TLS listener the sslcert run targets is wedged, and has been since about
+  2026-09-13 04:30 UTC** (dated from the stuck connections' socket timers). The process is
+  alive, so systemd reports it active, but its accept queue is full and a handshake from
+  outside times out. Cause: the responder runs the TLS handshake on its single accept thread
+  with no socket timeout, so one internet scanner that opened a connection and never sent a
+  ClientHello blocked it for good. **Firing now would return 25 connection failures on sslcert
+  that read exactly like a block.** ping/traceroute (`--only ping traceroute`) are unaffected.
+  A restart only clears it until the next scanner. The fix is a timeout on the raw socket
+  before the handshake (or doing the handshake in the worker thread), plus a re-check of the
+  cert fingerprint from a clean vantage. The listener also lives only on the box, outside this
+  repo, which is how a one-line liveness bug went unreviewed.
+- **Not fired.** Spending the credits is the operator's call once the listener is fixed and
+  re-verified.
 
 ## Next actions
 
