@@ -89,7 +89,8 @@ So, on the RU sensor:
 sudo LOK_PREFIX=netmon LOK_PROBE_KEY=<64 hex> deploy/sensor-setup.sh <server-ip>:47017
 ```
 
-installs `/usr/local/bin/netmon-probe`, `/etc/netmon/sensor.env`, `/var/log/netmon/battery.jsonl`
+installs `/usr/local/bin/netmon-probe`, `/usr/local/bin/netmon-path-snap`,
+`/etc/netmon/sensor.env`, `/var/log/netmon/{battery,path}.jsonl`
 and `netmon-sensor.{service,timer}` — unit `Description=` lines included. Pick your own prefix if
 you prefer; keep it boring and plausible for a VPS.
 
@@ -141,6 +142,20 @@ The script ends with a **pre-flight battery run and will not enable the timer un
 total block are indistinguishable in the data — all three produce nothing coming back. Sorting them
 out here costs a minute; sorting them out later means discovering that a week of rows reading
 "blocked" was a typo. If the block *is* the finding, re-run with `LOK_FORCE_ENABLE=1`.
+
+### The path log
+
+Every battery run also appends one compact traceroute line to `/var/log/<prefix>/path.jsonl`,
+fired from the sensor unit's `ExecStopPost`. It exists because of 2026-09-21/22: the battery
+logged 144 non-`ok` verdicts over 38 hours, host health and BGP both came back innocent, and with
+no path stored at those timestamps a reroute could not be ruled out — so the episode is still
+unexplained. `ExecStopPost` rather than `ExecStartPost` is deliberate: systemd skips the latter
+when the run failed, and a failed run is the interesting one.
+
+It adds no new cadence and no new traffic class — it rides the battery's existing jittered
+interval, so the loose-interval safety property is untouched — and it reads its target from
+`sensor.env` rather than a literal, so it cannot point anywhere the battery would not. The file
+self-caps at ~200k lines (about four years) instead of pulling in `logrotate`.
 
 Then **fill in the box's tags** (meaningless data until you do):
 

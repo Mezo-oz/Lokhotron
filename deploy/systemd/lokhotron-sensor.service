@@ -9,6 +9,12 @@ Wants=network-online.target
 Type=oneshot
 Environment=LOK_PREFIX=__PREFIX__
 ExecStart=/usr/local/bin/__PREFIX__-run-battery
+# Capture the path alongside the measurement. ExecStopPost, not ExecStartPost: systemd skips
+# ExecStartPost when ExecStart failed, and a failed run — the probe blowing its own deadline — is
+# exactly the one whose path we need. The leading "-" keeps a snapshot failure from changing this
+# unit's result: the battery's exit status is measurement data, and instrumentation must not be
+# able to forge it.
+ExecStopPost=-/usr/local/bin/__PREFIX__-path-snap
 # The AF_PACKET capture (injected-RST detection + TTL calibration) needs CAP_NET_RAW.
 # Runs as root by default, which has it. Hardened alternative: add a dedicated User= and keep
 # the two capability lines below so it runs with CAP_NET_RAW and nothing else.

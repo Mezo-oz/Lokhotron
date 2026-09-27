@@ -46,6 +46,7 @@ ensure_cargo
 ( cd "$REPO_ROOT" && cargo build --release -p probe )
 install -m0755 "$REPO_ROOT/target/release/probe" "/usr/local/bin/$LOK_PREFIX-probe"
 install -m0755 "$REPO_ROOT/deploy/run-battery.sh" "/usr/local/bin/$LOK_PREFIX-run-battery"
+install -m0755 "$REPO_ROOT/deploy/path-snap.sh" "/usr/local/bin/$LOK_PREFIX-path-snap"
 
 mkdir -p "/var/log/$LOK_PREFIX" "/etc/$LOK_PREFIX"
 
