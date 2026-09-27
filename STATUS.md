@@ -1,10 +1,16 @@
 # Lokhotron — STATUS
 
 > **Living sitrep. Keep it current.** Update this whenever a decision changes, a phase advances,
-> or an open question closes. Last updated: 2026-09-16 (first measured Phase 1 read: 641/641
+> or an open question closes. Last updated: 2026-09-27 (**sixteen days measured.** Clean for ten
+> days, then 144 non-`ok` verdicts inside a single 38-hour window on 09-21/22, then clean again
+> for five days. Host health and routing both came back innocent, so the episode is unexplained
+> — and it is **not** a censorship finding; see *Live run status*. The wedged Atlas sslcert
+> listener is **fixed and verified**, so the residential run is no longer blocked on it. Path
+> capture now runs beside every battery run, which is the instrumentation this episode showed
+> was missing). Prior: 2026-09-16 (first measured Phase 1 read: 641/641
 > keyed batteries `ok` over ~5 days, zero timer misses; the TSPU question narrowed but **not**
-> closed; the Atlas sslcert target was found wedged, which blocks the residential run until
-> fixed — see *Live run status*). Prior: 2026-09-09 (transport enum reconciled against
+> closed; the Atlas sslcert target was found wedged, which blocked the residential run until
+> fixed). Prior: 2026-09-09 (transport enum reconciled against
 > amnezia-client; screens re-run same-day — shortlist unchanged and clear to rent, but the
 > **telegram gap flipped sign**, so Correction 3's sign-flip property does not hold this month).
 > Prior: 2026-09-01 (re-ran both pre-spend screens — runbook
@@ -260,9 +266,54 @@ classifier against known-injected verdicts before any live run. See [ECHO.md](EC
      clone as its last line. LEGAL-RU.md item 5 previously asserted this rule while citing
      STATUS.md, which only stated rule 1; that gap is closed — in the tooling, not just prose.
 
-## Live run status (2026-09-16)
+## Live run status (2026-09-27)
 
 Measured from the sensor's own `battery.jsonl` (pulled read-only), not from the first-night rows.
+
+### The 09-21/22 episode: one 38-hour degradation, then clean again
+
+| | |
+|---|---|
+| Window | 2026-09-11 21:03 → 2026-09-27 18:32 UTC (~381 h) |
+| Attributed rows | 2043 (1 excluded, `asn:0`, logged before the tags were set) |
+| Non-`ok` | 149 — but **not spread**: 5 scattered over the first ten days, 144 inside one 38.2 h window, 0 since |
+| Episode | 2026-09-21 06:24:01 → 2026-09-22 20:33:15 UTC — 206 rows, **144 non-`ok` (69.9%)** |
+| Episode verdicts | `timeout_indistinct` 101, `not_evaluated`/`probe_error` 30, `udp_class_drop` 12, `throttle_to_rate` 1 |
+| Before | 1207 rows, 5 non-`ok` (0.4%) |
+| After | **630 consecutive rows, zero non-`ok`**, 2026-09-22 20:45 → 2026-09-27 18:32 UTC |
+
+Ruled out by checking, not by assuming:
+
+- **Not our echo host.** The responder has run continuously since 2026-09-11 21:15 with zero
+  restarts and no journal entries at all during the episode; no OOM, no kernel trouble, disk 36%.
+- **Not the sensor host.** No reboot, no kernel link/carrier/drop/OOM lines, and every battery
+  run started and exited cleanly except the 30 where the probe itself blew its 120 s deadline —
+  which is the symptom, not a fault of the host.
+- **Not a routing change.** BGP updates for the sensor's prefix across the episode are
+  indistinguishable from a clean control window of equal length two days later — 152 updates
+  and 3 withdrawals against 135 and 3 — and the upstream AS is the same single one throughout.
+  No reroute, no transit change, no prefix instability. Details recorded privately, as with the
+  rent-time routing check.
+- **Not peak-hour.** The first few non-`ok` rows all fell inside the sensor's local evening, which
+  looked like something. It does not survive more data: inside the episode, non-`ok` rows fall in
+  **all 24 hours of the day**.
+
+**What it is not evidence of.** The dominant verdict is `timeout_indistinct`, with 30 runs where
+the probe exceeded its own deadline. That is the signature of heavy loss or latency on the whole
+path, hitting both arms at once — not of selective treatment of a traffic class. A shaper acting
+on this battery would have to be reproducible; this stopped after 38 hours and has left 630 clean
+rows behind it. Read it as an **unexplained transport-level incident, not a censorship finding.**
+It is still the first structure the instrument has produced, and the honest summary is that we
+cannot say what caused it.
+
+**Why it could not be taken further, and what changed.** Nothing about the *path* was stored at
+the anomaly timestamps, so a reroute could only be excluded afterwards and indirectly, from BGP.
+That gap is now closed: a compact path snapshot is written beside every battery run, to its own
+log, at the battery's existing jittered cadence — no new cadence, no new traffic class, so the
+loose-interval safety property is untouched, and it derives its target from the battery's own
+config rather than a literal so it inherits the "never probe what we do not own" guarantee
+instead of restating it. It is attached with `ExecStopPost`, **not** `ExecStartPost`: systemd
+skips the latter when the run failed, and a failed run is exactly the one whose path matters.
 
 ### Phase 1, first five days
 
@@ -322,7 +373,7 @@ fingerprint-bearing transport in the battery, which is Phase 2 scope, or (b) a s
 at a shortlisted provider whose transit *is* Russian, where the same battery either diverges
 from this one or does not. (b) is the Correction 3 test anyway.
 
-### Residential Atlas run: not ready, blocked on the sslcert listener
+### Residential Atlas run: unblocked as of 2026-09-27, not fired
 
 - **Probe:** our software probe, connected continuously since 2026-09-12 23:30
   UTC, IPv4 and IPv6 stable-1d. Probe selection is not a constraint: 140 connected RU probes
@@ -331,19 +382,22 @@ from this one or does not. (b) is the Correction 3 test anyway.
   credits grant, and neither was available. Estimated from the documented earn rate at
   ~80k for ~3.9 days connected, against ~2,150 for the full 3-type × 25-probe baseline. Check
   the dashboard before trusting that figure.
-- **BLOCKER: the TLS listener the sslcert run targets is wedged, and has been since about
-  2026-09-13 04:30 UTC** (dated from the stuck connections' socket timers). The process is
-  alive, so systemd reports it active, but its accept queue is full and a handshake from
-  outside times out. Cause: the responder runs the TLS handshake on its single accept thread
-  with no socket timeout, so one internet scanner that opened a connection and never sent a
-  ClientHello blocked it for good. **Firing now would return 25 connection failures on sslcert
-  that read exactly like a block.** ping/traceroute (`--only ping traceroute`) are unaffected.
-  A restart only clears it until the next scanner. The fix is a timeout on the raw socket
-  before the handshake (or doing the handshake in the worker thread), plus a re-check of the
-  cert fingerprint from a clean vantage. The listener also lives only on the box, outside this
-  repo, which is how a one-line liveness bug went unreviewed.
-- **Not fired.** Spending the credits is the operator's call once the listener is fixed and
-  re-verified.
+- **FIXED 2026-09-27: the TLS listener the sslcert run targets is no longer wedged.** It had
+  been stuck since about 2026-09-13 04:30 UTC (dated from the stuck connections' socket timers)
+  — process alive, so systemd reported it active, accept queue full, handshake from outside
+  timing out. Cause: the responder ran the TLS handshake on its single accept thread with no
+  socket timeout, so one internet scanner that opened a connection and never sent a ClientHello
+  blocked it for good; the one timeout the script did set was on the already-wrapped socket,
+  inside the worker, where it could never bound the handshake. Firing the run in that state
+  would have returned 25 connection failures on sslcert that read exactly like a block. The
+  handshake now happens in the worker under a deadline, behind a bounded slot semaphore, so a
+  scanner can hold slots but never the accept loop. Verified after the fix: accept queue back to
+  0, cert fingerprint unchanged from the recorded ground truth, and handshakes still complete
+  while several deliberately silent connections are held open — the exact input that killed the
+  old code. The listener still lives only on the box, outside this repo, which is how a one-line
+  liveness bug went unreviewed; putting it and its unit under `deploy/` is the open follow-up.
+- **Not fired.** The listener blocker is cleared and re-verified, so what is left is reading the
+  real credit balance and the operator's decision to spend it.
 
 ## Next actions
 
