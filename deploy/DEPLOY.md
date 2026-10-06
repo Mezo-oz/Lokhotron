@@ -124,6 +124,30 @@ systemctl status netmon-echo
 ss -lunp | grep 47017     # UDP listener
 ```
 
+### Optional: the TLS listener for the Atlas sslcert run
+
+Only `phase0/atlas_residential.py`'s `sslcert` type needs this; ping and traceroute do not. On
+the same box:
+
+```sh
+sudo LOK_PREFIX=netmon deploy/tls-setup.sh <the box's public IPv4>     # port defaults to 443
+```
+
+Generates a self-signed EC cert for that IP into `/etc/<prefix>-tls/`, installs
+`deploy/tls-responder.py` as `<prefix>-tls`, opens the port, then **completes a real handshake
+against itself** and prints the cert's SHA-256 fingerprint. Record that fingerprint privately:
+every `sslcert` result is diffed against it, which is why a re-run **keeps** an existing cert
+rather than regenerating it. A re-run does replace the script and restart the unit.
+
+The final handshake check is there because `systemctl status` is not evidence: the first version
+of this responder wedged for two weeks with systemd reporting it active (see the script's
+`handle()`). A dead listener reads to Atlas exactly like a block, so check it before firing a run:
+
+```sh
+echo | openssl s_client -connect <ip>:443 2>/dev/null | openssl x509 -noout -fingerprint -sha256
+ss -ltn sport = :443      # Recv-Q should be 0, not pinned at the backlog
+```
+
 ## RU sensor
 
 On a clone of this repo on the box:
@@ -219,4 +243,5 @@ Phase 2 (CONTRACT open questions).
   change both ends together — a sensor left on the old key goes silent, and silence is the one
   signal this system cannot tell apart from censorship.
 - **Teardown.** `sudo systemctl disable --now lokhotron-echo` /
-  `lokhotron-sensor.timer`, then remove the unit files and `/usr/local/bin/lokhotron-*`.
+  `lokhotron-sensor.timer`, then remove the unit files and `/usr/local/bin/lokhotron-*`. The TLS
+  listener, if installed: `<prefix>-tls`, `/opt/<prefix>-tls`, `/etc/<prefix>-tls`.

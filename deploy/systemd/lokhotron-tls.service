@@ -1,0 +1,21 @@
+[Unit]
+Description=Network path TLS responder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/__PREFIX__-tls/server.py /etc/__PREFIX__-tls/cert.pem /etc/__PREFIX__-tls/key.pem __PORT__
+# No restart policy would have caught the 2026-09-13 wedge: the process stayed alive and
+# systemd kept reporting it active. The fix for that lives in the script, not here.
+Restart=on-failure
+RestartSec=2
+# Runs as root: it binds 443 and reads the 0600 key. Everything else is locked down.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/etc/__PREFIX__-tls
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

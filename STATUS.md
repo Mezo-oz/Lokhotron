@@ -394,8 +394,13 @@ from this one or does not. (b) is the Correction 3 test anyway.
   scanner can hold slots but never the accept loop. Verified after the fix: accept queue back to
   0, cert fingerprint unchanged from the recorded ground truth, and handshakes still complete
   while several deliberately silent connections are held open — the exact input that killed the
-  old code. The listener still lives only on the box, outside this repo, which is how a one-line
-  liveness bug went unreviewed; putting it and its unit under `deploy/` is the open follow-up.
+  old code. The listener used to live only on the box, outside this repo, which is how a
+  one-line liveness bug went unreviewed. **It is now in the repo** (2026-10-06):
+  `deploy/tls-setup.sh` installs `deploy/tls-responder.py` and its unit, keeps an existing cert
+  so the recorded fingerprint survives a re-run, and ends by completing a handshake rather than
+  trusting systemd. Flood-tested: with 80 silent connections held, more than the 64 slots, a
+  real handshake still completed in ~8 s (the 10 s handshake deadline frees slots), and in
+  ~50 ms once the flood ended.
 - **Not fired.** The listener blocker is cleared and re-verified, so what is left is reading the
   real credit balance and the operator's decision to spend it.
 
